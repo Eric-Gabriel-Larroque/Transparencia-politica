@@ -23,7 +23,7 @@ export const cgu = {
   motivoNaoAplicavel: () => (chave()
     ? 'Sem CPF divulgado pelo TSE: não dá para cruzar com segurança.'
     : 'Fonte desativada: falta a chave da API do Portal da Transparência (variável CHAVE_PORTAL_TRANSPARENCIA).'),
-  async consultar(p) {
+  async consultar(p, { db }) {
     const [ceis, cnep, ceaf, peps] = await Promise.all([
       get(`ceis?codigoSancionado=${p.cpf}&pagina=1`),
       get(`cnep?codigoSancionado=${p.cpf}&pagina=1`),
@@ -36,7 +36,9 @@ export const cgu = {
     // Só faz sentido para quem disputou mandato federal. A API busca por trecho do nome e é sensível
     // a acentos (guarda sem acento). Aceita o autor só se todas as palavras do nome dele na CGU
     // estiverem no nome civil completo ("EUNICIO OLIVEIRA" ⊂ "EUNICIO LOPES DE OLIVEIRA").
-    const federal = p.cargos.some((c) => /DEPUTADO FEDERAL|SENADOR/i.test(c));
+    const federal = p.cargos.some((c) => /DEPUTADO FEDERAL|SENADOR/i.test(c))
+      || Boolean(p.nascimento && db.prepare('SELECT 1 FROM camara_deputados WHERE nome_norm = ? AND nascimento = ?')
+        .get(p.nome_norm, p.nascimento));
     const palavrasCivis = new Set(p.nome_norm.split(' '));
     const ehAutor = (e) => normalizar(e.nomeAutor).split(' ').every((w) => palavrasCivis.has(w));
     let emendas = [];

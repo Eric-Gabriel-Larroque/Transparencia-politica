@@ -126,3 +126,20 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: now
 
 details { margin-top: 8px; }
 summary { cursor: pointer; color: var(--destaque); font-weight: 600; font-size: .9rem; padding: 6px 0; }
+
+a.etiqueta { text-decoration: none; color: var(--destaque); }
+a.etiqueta:hover { border-color: var(--destaque); }
+
+.nao-cobre { margin-top: 16px; padding: 12px 14px; border-radius: 8px; background: var(--aviso-fundo); color: var(--texto); font-size: .9rem; }
+.nao-cobre strong { color: var(--aviso); }
+.nao-cobre p { margin: 4px 0; }
+.nao-cobre ul { margin: 4px 0 0; padding-left: 20px; }
+
+.bens-ano { border-top: 1px solid var(--borda); padding: 4px 0; }
+.bens-ano summary { display: flex; justify-content: space-between; gap: 12px; color: var(--texto); font-weight: 600; }
+.bens-total { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bens-ano table { margin-top: 6px; }
+.lista-bens { list-style: none; padding: 0; margin: 6px 0; }
+.lista-bens li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--borda); font-size: .9rem; }
+.lista-bens li > div:first-child { min-width: 0; overflow-wrap: anywhere; }
+.bens-valor { font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 600; }

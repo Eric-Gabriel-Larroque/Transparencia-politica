@@ -62,6 +62,7 @@ async function buscar(q) {
 function etiquetaCorrespondencia(c) {
   if (c === 'cpf') return '<span class="etiqueta cpf" title="Cruzamento exato pelo CPF">por CPF</span>';
   if (c === 'nome') return '<span class="etiqueta nome" title="Cruzamento pelo nome: pode haver homônimos">por nome</span>';
+  if (c === 'nome_nascimento') return '<span class="etiqueta cpf" title="Cruzamento pelo nome civil completo e pela data de nascimento">por nome e nascimento</span>';
   return '';
 }
 
@@ -98,6 +99,27 @@ function blocoFonte(f) {
   return `<section class="cartao">${cab}<p class="meta">${esc(f.descricao)}</p>${aviso}${indicadores}${registros}${vazio}</section>`;
 }
 
+function blocoBens(bens) {
+  if (!bens.length) return '';
+  const linhas = bens.map((b) => `
+    <details class="bens-ano">
+      <summary><span class="bens-titulo">${b.ano} · ${esc(capitalizar(b.cargo))}${b.unidade ? ` (${esc(capitalizar(b.unidade))})` : ''}</span>
+        <span class="bens-total">${brl(b.total)}</span></summary>
+      <ul class="lista-bens">${b.itens.map((i) => `
+        <li><div><div>${esc(i.descricao ?? '—')}</div><div class="meta">${esc(i.tipo ?? '')}</div></div>
+          <div class="bens-valor">${brl(i.valor)}</div></li>`).join('')}</ul>
+      <p class="meta">${b.qtd} bem(ns) declarado(s) · Fonte: <a href="${esc(b.link)}" target="_blank" rel="noopener">TSE – Dados Abertos, Candidatos ${b.ano} (arquivo "Bens de candidatos")</a></p>
+    </details>`).join('');
+  return `<section class="cartao">
+    <h2>Bens declarados</h2>
+    <p class="orgao">TSE – Tribunal Superior Eleitoral · <a href="${esc(bens.at(-1).link)}" target="_blank" rel="noopener">fonte oficial</a></p>
+    <p class="meta">Ao registrar uma candidatura, todo candidato é obrigado a entregar à Justiça Eleitoral uma lista dos seus bens
+      com o valor de cada um. Os valores abaixo são exatamente os que o próprio candidato informou: não são auditados,
+      costumam seguir o valor de compra (não o de mercado) e não têm correção pela inflação. Toque em um ano para ver a lista.</p>
+    ${linhas}
+  </section>`;
+}
+
 async function telaPerfil(id) {
   app.innerHTML = `<a class="voltar" href="javascript:history.back()">← voltar</a>
     <p class="carregando">Consultando TSE, TCU, CNJ, Câmara e Senado (pode levar até 30 segundos)</p>`;
@@ -123,8 +145,13 @@ async function telaPerfil(id) {
       <p class="orgao">Gerado por regras fixas (contagens e somas) a partir das fontes abaixo.</p>
       <ul class="resumo">${d.resumo.map((l) => `
         <li class="${esc(l.tipo)}"><span class="ponto" aria-hidden="true"></span>
-          <div>${esc(l.texto)}${l.fonte ? ` <span class="etiqueta">${esc(l.fonte)}</span>` : ''}
+          <div>${esc(l.texto)}${l.fonte ? ` ${l.link ? `<a class="etiqueta" href="${esc(l.link)}" target="_blank" rel="noopener" title="Abrir a fonte oficial">${esc(l.fonte)} ↗</a>` : `<span class="etiqueta">${esc(l.fonte)}</span>`}` : ''}
           ${l.detalhe ? `<div class="detalhe">${esc(l.detalhe)}</div>` : ''}</div></li>`).join('')}</ul>
+      <div class="nao-cobre">
+        <strong>O que esta ficha não verifica</strong>
+        <p>"Nenhum registro" acima significa só que nada foi encontrado nas bases consultadas. Ficam de fora:</p>
+        <ul>${d.naoCobre.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>
+      </div>
     </section>
 
     <section class="cartao">
@@ -138,6 +165,8 @@ async function telaPerfil(id) {
           <td class="num">${brl(c.bens)}</td></tr>`).join('')}</tbody>
       </table></div>
     </section>
+
+    ${blocoBens(d.bens)}
 
     ${d.fontes.map(blocoFonte).join('')}
 

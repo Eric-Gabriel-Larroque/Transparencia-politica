@@ -7,7 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { abrirBanco } from './lib/db.js';
 import { normalizar, soDigitos, mascararCpf } from './lib/util.js';
-import { montarResumo } from './resumo.js';
+import { montarResumo, NAO_COBRE } from './resumo.js';
 import { tse, tcu } from './fontes/locais.js';
 import { cnj } from './fontes/cnj.js';
 import { camara, senado } from './fontes/legislativo.js';
@@ -88,6 +88,7 @@ async function consultarFontes(p) {
     const inicio = Date.now();
     try {
       const r = await comTimeout(f.consultar(p, { db }), TIMEOUT_FONTE);
+      if (r.naoAplicavel) return { ...base, status: 'nao_aplicavel', motivo: r.motivo };
       return { ...base, status: 'ok', ms: Date.now() - inicio, ...r };
     } catch (e) {
       console.error(`[${f.id}]`, e.message);
@@ -113,6 +114,8 @@ async function perfil(id) {
       resultado: c.resultado, situacao: c.detalhe_situacao ?? c.situacao, bens: c.bens_total,
     })),
     resumo: montarResumo(p, fontes),
+    naoCobre: NAO_COBRE,
+    bens: fontes.find((f) => f.id === 'tse')?.bens ?? [],
     fontes,
     consultadoEm: new Date().toISOString(),
     indiceAtualizadoEm: db.prepare("SELECT valor FROM meta WHERE chave = 'atualizado_em'").get()?.valor,

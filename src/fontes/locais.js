@@ -1,5 +1,7 @@
 // Fontes que já estão no índice local (baixadas por "npm run indexar"): TSE e TCU.
 
+import { linkDadosTse } from '../lib/db.js';
+
 const LINK_TSE = 'https://dadosabertos.tse.jus.br/dataset/?groups=candidatos';
 const LINK_TCU = 'https://sites.tcu.gov.br/dados-abertos/inidoneos-irregulares/';
 
@@ -33,15 +35,25 @@ export const tse = {
         situacao: [c.detalhe_situacao, c.situacao_julgamento, c.situacao_cassacao].filter(Boolean).join(' · '),
         detalhe: motivos.length ? `Motivo(s) informado(s): ${[...new Set(motivos)].join('; ')}` : null,
         data: String(c.ano),
-        link: LINK_TSE,
+        link: linkDadosTse(c.ano),
       });
     }
 
+    // Bens: uma declaração por eleição, com a lista de itens como o candidato informou.
+    const itens = db.prepare('SELECT tipo, descricao, valor FROM bens WHERE ano = ? AND sq = ? ORDER BY valor DESC');
     const bens = p.candidaturas
       .filter((c) => c.bens_total != null)
-      .map((c) => ({ ano: c.ano, total: c.bens_total, qtd: c.bens_qtd }))
       .sort((a, b) => a.ano - b.ano)
-      .filter((b, i, arr) => i === arr.findIndex((x) => x.ano === b.ano));
+      .filter((c, i, arr) => i === arr.findIndex((x) => x.ano === c.ano))
+      .map((c) => ({
+        ano: c.ano,
+        cargo: c.cargo,
+        unidade: c.unidade,
+        total: c.bens_total,
+        qtd: c.bens_qtd,
+        itens: itens.all(c.ano, c.sq),
+        link: linkDadosTse(c.ano),
+      }));
 
     return {
       correspondencia: p.cpf ? 'cpf' : 'nome',

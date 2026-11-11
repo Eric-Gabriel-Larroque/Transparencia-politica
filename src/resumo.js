@@ -1,13 +1,34 @@
 // Resumo determinístico do perfil: só contagens, somas e comparações com regras fixas.
-// Nada aqui interpreta texto ou dá nota. Cada linha diz de que fonte veio.
+// Nada aqui interpreta texto ou dá nota. Cada linha diz de que fonte veio, com link.
 
 const brl = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 const plural = (n, um, varios) => `${n.toLocaleString('pt-BR')} ${n === 1 ? um : varios}`;
+
+/** O que a ficha NÃO consulta. Aparece sempre, para "nada encontrado" não ser lido como "ficha limpa". */
+export const NAO_COBRE = [
+  'Processos e condenações criminais (STF, STJ, tribunais regionais federais e tribunais de justiça estaduais). Não existe base pública unificada desses dados.',
+  'Inelegibilidade declarada pela Justiça Eleitoral em ações próprias (como AIJE), quando a pessoa não se candidatou depois da decisão.',
+  'Tribunais de contas estaduais e municipais.',
+  'Candidaturas anteriores a 2018.',
+];
+
+// Frases por fonte: [com registros, sem registros]. Dizem exatamente o que foi buscado e onde.
+const FRASES = {
+  tse: ['registro(s) de candidatura indeferido(s) ou cassado(s) pela Justiça Eleitoral',
+    'Nenhum registro de candidatura indeferido ou cassado entre as candidaturas desde 2018'],
+  tcu: ['registro(s) nas listas de responsáveis do TCU',
+    'Nenhum registro nas listas de responsáveis do TCU (contas irregulares, inabilitados, inidôneos)'],
+  cnj: ['condenação(ões) cível(is) por improbidade administrativa no cadastro do CNJ',
+    'Nenhuma condenação cível por improbidade administrativa no cadastro do CNJ'],
+  cgu: ['sanção(ões) administrativa(s) no Portal da Transparência',
+    'Nenhuma sanção administrativa no Portal da Transparência (CEIS, CNEP, CEAF)'],
+};
 
 export function montarResumo(p, fontes) {
   const linhas = [];
   const fonte = (id) => fontes.find((f) => f.id === id);
   const c = p.candidaturas;
+  const tse = fonte('tse');
 
   // Trajetória eleitoral
   const eleito = c.filter((x) => /^ELEITO/i.test(x.resultado ?? ''));
@@ -17,21 +38,29 @@ export function montarResumo(p, fontes) {
     texto: `${plural(c.length, 'candidatura', 'candidaturas')} ${Math.min(...anos) === Math.max(...anos) ? `(${anos[0]})` : `entre ${Math.min(...anos)} e ${Math.max(...anos)}`}; ${eleito.length ? `eleito(a) ${plural(eleito.length, 'vez', 'vezes')}` : 'não foi eleito(a)'}.`,
     detalhe: eleito.length ? `Mandatos conquistados: ${eleito.map((x) => `${x.cargo} (${x.ano}${x.unidade ? `, ${x.unidade}` : ''})`).join('; ')}` : null,
     fonte: 'TSE',
+    link: tse?.link,
   });
 
   // Evolução patrimonial declarada
-  const bens = fonte('tse')?.bens ?? [];
+  const bens = tse?.bens ?? [];
   if (bens.length >= 2) {
     const [primeiro, ultimo] = [bens[0], bens.at(-1)];
     const variacao = primeiro.total > 0 ? Math.round(((ultimo.total - primeiro.total) / primeiro.total) * 100) : null;
     linhas.push({
       tipo: 'bens',
-      texto: `Bens declarados passaram de ${brl(primeiro.total)} (${primeiro.ano}) para ${brl(ultimo.total)} (${ultimo.ano})${variacao != null ? `: ${variacao >= 0 ? '+' : ''}${variacao.toLocaleString('pt-BR')}%` : ''}.`,
-      detalhe: 'Valores nominais, como declarados pelo próprio candidato ao TSE, sem correção pela inflação.',
+      texto: `Bens declarados ao TSE passaram de ${brl(primeiro.total)} (${primeiro.ano}) para ${brl(ultimo.total)} (${ultimo.ano})${variacao != null ? `: ${variacao >= 0 ? '+' : ''}${variacao.toLocaleString('pt-BR')}%` : ''}.`,
+      detalhe: 'Soma dos bens que o próprio candidato declarou ao registrar cada candidatura. Valores nominais, sem correção pela inflação. Veja a lista de cada bem na seção "Bens declarados".',
       fonte: 'TSE',
+      link: ultimo.link,
     });
   } else if (bens.length === 1) {
-    linhas.push({ tipo: 'bens', texto: `Bens declarados em ${bens[0].ano}: ${brl(bens[0].total)}.`, fonte: 'TSE' });
+    linhas.push({
+      tipo: 'bens',
+      texto: `Bens declarados ao TSE em ${bens[0].ano}: ${brl(bens[0].total)}.`,
+      detalhe: 'Soma dos bens que o próprio candidato declarou ao registrar a candidatura.',
+      fonte: 'TSE',
+      link: bens[0].link,
+    });
   }
 
   // Registros em órgãos de controle e Justiça
@@ -42,23 +71,22 @@ export function montarResumo(p, fontes) {
     const regs = f.registros ?? [];
     const porNome = regs.filter((r) => (r.correspondencia ?? f.correspondencia) === 'nome').length;
     const n = regs.length - porNome;
-    const [com, sem] = {
-      tse: ['registro(s) de candidatura indeferido(s) ou cassado(s)', 'Nenhum registro de candidatura indeferido ou cassado'],
-      tcu: ['registro(s) nas listas de responsáveis do TCU', 'Nenhum registro nas listas de responsáveis do TCU'],
-      cnj: ['condenação(ões) por improbidade no cadastro do CNJ', 'Nenhuma condenação por improbidade no cadastro do CNJ'],
-      cgu: ['sanção(ões) no Portal da Transparência', 'Nenhuma sanção no Portal da Transparência'],
-    }[id];
-    const sigla = f.orgao.split(' – ')[0];
-    if (id === 'tse') { linhas.push({ tipo: n ? 'alerta' : 'limpo', texto: n ? `${n} ${com}.` : `${sem}.`, fonte: sigla }); continue; }
-    if (n) linhas.push({ tipo: 'alerta', texto: `${n} ${com}, confirmado(s) pelo CPF.`, fonte: sigla });
-    else if (f.correspondencia === 'cpf') linhas.push({ tipo: 'limpo', texto: `${sem} pelo CPF.`, fonte: sigla });
-    else if (!porNome) linhas.push({ tipo: 'limpo', texto: `${sem} pelo nome completo (o TSE não divulgou o CPF).`, fonte: sigla });
+    const [com, sem] = FRASES[id];
+    const base = { fonte: f.orgao.split(' – ')[0], link: f.link };
+    if (id === 'tse') {
+      linhas.push({ ...base, tipo: n ? 'alerta' : 'limpo', texto: n ? `${n} ${com}.` : `${sem}.`,
+        detalhe: n ? regs.map((r) => `${r.titulo}${r.detalhe ? ` (${r.detalhe})` : ''}`).join('; ') : null });
+      continue;
+    }
+    if (n) linhas.push({ ...base, tipo: 'alerta', texto: `${n} ${com}, confirmado(s) pelo CPF.` });
+    else if (f.correspondencia === 'cpf') linhas.push({ ...base, tipo: 'limpo', texto: `${sem} (busca pelo CPF).` });
+    else if (!porNome) linhas.push({ ...base, tipo: 'limpo', texto: `${sem} (busca pelo nome completo; o TSE não divulgou o CPF).` });
     if (porNome) {
       linhas.push({
+        ...base,
         tipo: 'aviso',
         texto: `${porNome} registro(s) de alguém com o mesmo nome completo, sem CPF para confirmar se é a mesma pessoa.`,
         detalhe: 'Pode ser homônimo. Abra cada registro na fonte oficial antes de tirar conclusões.',
-        fonte: sigla,
       });
     }
   }
@@ -71,6 +99,7 @@ export function montarResumo(p, fontes) {
       tipo: 'atuacao',
       texto: f.indicadores.map((i) => `${i.rotulo}: ${i.valor}`).join(' · '),
       fonte: f.orgao.split(' – ')[0],
+      link: f.link,
     });
   }
 

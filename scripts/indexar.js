@@ -11,7 +11,7 @@ import path from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { abrirBanco, ESQUEMA, PASTA_DADOS, CAMINHO_DB } from '../src/lib/db.js';
-import { linhasDoZip } from '../src/lib/csvzip.js';
+import { linhasDoZip, dividirLinha } from '../src/lib/csvzip.js';
 import { normalizar, soDigitos, numeroBr, limpoTse, http } from '../src/lib/util.js';
 
 const ANOS = (process.env.ANOS || '2018,2020,2022,2024,2026').split(',').map((a) => a.trim()).filter(Boolean);
@@ -85,13 +85,22 @@ async function indexarBens(db, ano) {
   const zip = path.join(PASTA_BRUTOS, `bem_candidato_${ano}.zip`);
   if (!(await baixar(`${CDN_TSE}/bem_candidato/bem_candidato_${ano}.zip`, zip))) return;
   const somas = new Map();
+  const inserirBem = db.prepare('INSERT INTO bens (ano, sq, ordem, tipo, descricao, valor) VALUES (?, ?, ?, ?, ?, ?)');
+  db.exec('BEGIN');
+  let n = 0;
   for await (const l of linhasDoZip(zip)) {
-    const chave = `${Number(l.ANO_ELEICAO) || ano}|${l.SQ_CANDIDATO}`;
+    const a = Number(l.ANO_ELEICAO) || Number(ano);
+    const valor = numeroBr(l.VR_BEM_CANDIDATO);
+    inserirBem.run(a, l.SQ_CANDIDATO, Number(l.NR_ORDEM_BEM_CANDIDATO) || null, limpoTse(l.DS_TIPO_BEM_CANDIDATO),
+      limpoTse(l.DS_BEM_CANDIDATO), valor);
+    if (++n % 200_000 === 0) db.exec('COMMIT; BEGIN');
+    const chave = `${a}|${l.SQ_CANDIDATO}`;
     const s = somas.get(chave) ?? [0, 0];
-    s[0] += numeroBr(l.VR_BEM_CANDIDATO);
+    s[0] += valor;
     s[1] += 1;
     somas.set(chave, s);
   }
+  db.exec('COMMIT');
   const atualizar = db.prepare('UPDATE candidaturas SET bens_total = ?, bens_qtd = ? WHERE ano = ? AND sq = ?');
   db.exec('BEGIN');
   for (const [chave, [total, qtd]] of somas) {
@@ -158,6 +167,34 @@ async function indexarTcu(db) {
   }
 }
 
+// ---------------------------------------------------------------- Câmara
+
+// Arquivo com todos os deputados desde 1826. Não traz CPF, mas traz nome civil e data de nascimento,
+// que cruzamos com o TSE (mesmo nome completo + mesma data de nascimento).
+async function indexarDeputados(db) {
+  const destino = path.join(PASTA_BRUTOS, 'camara_deputados.csv');
+  fs.rmSync(destino, { force: true }); // sempre a versão mais recente
+  await baixar('https://dadosabertos.camara.leg.br/arquivos/deputados/csv/deputados.csv', destino);
+  const linhas = fs.readFileSync(destino, 'utf8').replace(/^\uFEFF/, '').split(/\r?\n/).filter(Boolean);
+  const cab = dividirLinha(linhas.shift());
+  const inserir = db.prepare(`INSERT OR REPLACE INTO camara_deputados (id, nome, nome_civil, nome_norm, nascimento, leg_ini, leg_fim)
+    VALUES (?, ?, ?, ?, ?, ?, ?)`);
+  db.exec('BEGIN');
+  let n = 0;
+  for (const linha of linhas) {
+    const campos = dividirLinha(linha);
+    const c = Object.fromEntries(cab.map((k, i) => [k, campos[i]]));
+    const leg = Number(c.idLegislaturaFinal);
+    if (!(leg >= 47)) continue; // de 1983 em diante
+    const [a, m, d] = (c.dataNascimento ?? '').split('-');
+    inserir.run(Number(c.uri.split('/').pop()), c.nome, c.nomeCivil, normalizar(c.nomeCivil),
+      a ? `${d}/${m}/${a}` : null, Number(c.idLegislaturaInicial), leg);
+    n++;
+  }
+  db.exec('COMMIT; CREATE INDEX IF NOT EXISTS ix_dep_nome ON camara_deputados (nome_norm);');
+  log(`Câmara: ${n.toLocaleString('pt-BR')} deputados desde 1983`);
+}
+
 // ---------------------------------------------------------------- Pessoas
 
 function montarPessoas(db) {
@@ -186,6 +223,7 @@ function montarPessoas(db) {
     CREATE INDEX IF NOT EXISTS ix_tcu_cpf ON tcu (cpf);
     CREATE INDEX IF NOT EXISTS ix_tcu_nome ON tcu (nome_norm);
     CREATE INDEX IF NOT EXISTS ix_cass ON cassacoes (ano, sq);
+    CREATE INDEX IF NOT EXISTS ix_bens ON bens (ano, sq);
     DELETE FROM pessoas;
     INSERT INTO pessoas (pessoa, id, nome, urnas, partidos, cargos, ufs, primeiro_ano, ultimo_ano, candidaturas, eleito, busca)
     SELECT c.pessoa,
@@ -222,6 +260,7 @@ async function main() {
   }
   db.exec('CREATE INDEX IF NOT EXISTS ix_cand_cpf ON candidaturas (cpf)');
   await indexarTcu(db);
+  await indexarDeputados(db);
   montarPessoas(db);
 
   const meta = db.prepare('INSERT OR REPLACE INTO meta (chave, valor) VALUES (?, ?)');

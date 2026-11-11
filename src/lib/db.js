@@ -52,6 +52,12 @@ CREATE TABLE IF NOT EXISTS pessoas (
   primeiro_ano INTEGER, ultimo_ano INTEGER, candidaturas INTEGER, eleito INTEGER,
   busca TEXT
 );
+CREATE TABLE IF NOT EXISTS bens (
+  ano INTEGER, sq TEXT, ordem INTEGER, tipo TEXT, descricao TEXT, valor REAL
+);
+CREATE TABLE IF NOT EXISTS camara_deputados (
+  id INTEGER PRIMARY KEY, nome TEXT, nome_civil TEXT, nome_norm TEXT, nascimento TEXT, leg_ini INTEGER, leg_fim INTEGER
+);
 CREATE TABLE IF NOT EXISTS meta (chave TEXT PRIMARY KEY, valor TEXT);
 `;
 
@@ -63,4 +69,10 @@ export function abrirBanco({ escrita = false, caminho = CAMINHO_DB } = {}) {
   const db = new DatabaseSync(caminho, { readOnly: !escrita });
   if (escrita) db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = OFF;');
   return db;
+}
+
+/** Página do conjunto de dados de candidatos do TSE de cada ano (fonte oficial dos bens). */
+export function linkDadosTse(ano) {
+  const slug = Number(ano) === 2020 ? 'candidatos-2020-subtemas' : `candidatos-${ano}`;
+  return `https://dadosabertos.tse.jus.br/dataset/${slug}`;
 }
