@@ -95,15 +95,17 @@ export function montarResumo(p, fontes) {
   // Processos no Diário de Justiça (sempre só por nome: vira aviso, nunca alerta)
   const dj = fonte('djen');
   if (dj?.status === 'ok') {
-    const c = dj.contagem ?? { total: 0, criminal: 0, improbidade: 0 };
-    linhas.push(c.total ? {
+    const k = dj.contagem ?? { total: 0, criminal: 0, improbidade: 0, outros: 0, onde: '' };
+    const extras = [k.criminal && `${k.criminal} de classe criminal`, k.improbidade && `${k.improbidade} de improbidade/ação civil pública`].filter(Boolean);
+    linhas.push(k.total ? {
       tipo: 'aviso',
-      texto: `${c.total} processo(s) com publicação no Diário de Justiça desde 2024 em nome de alguém com o mesmo nome completo${c.criminal ? `, ${c.criminal} de classe criminal` : ''}${c.improbidade ? `, ${c.improbidade} de improbidade/ação civil pública` : ''}.`,
+      texto: `${k.total} processo(s) com publicação no Diário de Justiça desde 2024 em tribunais de ${k.onde}, em nome de alguém com o mesmo nome completo${extras.length ? ` (${extras.join(', ')})` : ''}.`,
       detalhe: 'Sem CPF para confirmar que é a mesma pessoa. Aparecer num processo não significa culpa. Veja a lista na seção do Diário de Justiça.',
       fonte: 'DJEN', link: dj.link,
     } : {
       tipo: 'limpo',
-      texto: 'Nenhuma publicação no Diário de Justiça desde 2024 com esse nome completo (processos em sigilo não aparecem).',
+      texto: `Nenhuma publicação no Diário de Justiça desde 2024 com esse nome completo em tribunais de ${k.onde} (processos em sigilo não aparecem).`,
+      detalhe: k.outros ? `Há ${k.outros} processo(s) com o mesmo nome em outros estados, provavelmente de outras pessoas.` : null,
       fonte: 'DJEN', link: dj.link,
     });
   }

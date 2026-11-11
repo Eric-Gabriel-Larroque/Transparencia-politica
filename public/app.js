@@ -93,10 +93,12 @@ function blocoFonte(f) {
     <ul class="registros">${regs.slice(0, 5).map(item).join('')}</ul>
     ${regs.length > 5 ? `<details><summary>Ver todos os ${regs.length} registros</summary>
       <ul class="registros">${regs.slice(5).map(item).join('')}</ul></details>` : ''}` : '';
+  const outros = f.registrosOutros?.length ? `<details class="outros"><summary>${esc(f.tituloOutros)}</summary>
+      <ul class="registros">${f.registrosOutros.map(item).join('')}</ul></details>` : '';
 
-  const vazio = !indicadores && !registros ? '<p class="caixa neutra">Nenhum registro encontrado nesta fonte.</p>' : '';
+  const vazio = !indicadores && !registros && !outros ? '<p class="caixa neutra">Nenhum registro encontrado nesta fonte.</p>' : '';
   const aviso = f.aviso ? `<p class="caixa aviso">${esc(f.aviso)}</p>` : '';
-  return `<section class="cartao">${cab}<p class="meta">${esc(f.descricao)}</p>${aviso}${indicadores}${registros}${vazio}</section>`;
+  return `<section class="cartao">${cab}<p class="meta">${esc(f.descricao)}</p>${aviso}${indicadores}${registros}${outros}${vazio}</section>`;
 }
 
 function blocoBens(bens) {

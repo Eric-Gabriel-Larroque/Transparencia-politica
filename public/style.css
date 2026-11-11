@@ -143,3 +143,5 @@ a.etiqueta:hover { border-color: var(--destaque); }
 .lista-bens li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--borda); font-size: .9rem; }
 .lista-bens li > div:first-child { min-width: 0; overflow-wrap: anywhere; }
 .bens-valor { font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 600; }
+details.outros { margin-top: 14px; border-top: 1px dashed var(--borda); padding-top: 6px; }
+details.outros summary { color: var(--suave); }
