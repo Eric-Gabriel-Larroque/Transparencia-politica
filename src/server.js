@@ -134,6 +134,9 @@ async function perfil(id) {
     bens: fontes.find((f) => f.id === 'tse')?.bens ?? [],
     fontes,
     consultadoEm: new Date().toISOString(),
+    apoio: (process.env.APOIO_URL || process.env.APOIO_PIX)
+      ? { url: process.env.APOIO_URL || null, pix: process.env.APOIO_PIX || null }
+      : null,
     indiceAtualizadoEm: db.prepare("SELECT valor FROM meta WHERE chave = 'atualizado_em'").get()?.valor,
   };
   // Só guarda no cache se nenhuma fonte falhou, para tentar de novo na próxima visita.
