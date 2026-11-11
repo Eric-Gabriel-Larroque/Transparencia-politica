@@ -127,6 +127,14 @@ function blocoBens(bens) {
   </section>`;
 }
 
+/** CNPJ: 14 dígitos (formatado). CPF de pessoa física já vem mascarado do servidor (***.123.456-**). */
+function documento(doc, nome) {
+  if (!doc || doc === nome) return null;
+  if (/^\d{14}$/.test(doc)) return `CNPJ ${doc.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')}`;
+  if (/^\*{3}\.\d{3}\.\d{3}-\*{2}$/.test(doc)) return `CPF ${doc}`;
+  return null;
+}
+
 function blocoFinanciamento(lista) {
   if (!lista?.length) return '';
   const tabela = (titulo, linhas, colunas) => linhas.length ? `
@@ -144,9 +152,9 @@ function blocoFinanciamento(lista) {
       </div>
       ${tabela('De onde veio o dinheiro', c.fontes, [(x) => x.nome])}
       ${tabela('Por origem', c.origens, [(x) => x.origem, (x) => `${x.qtd} receita(s)`])}
-      ${tabela('Maiores doadores', c.doadores, [(x) => x.nome ?? x.doc, (x) => [x.origem, x.doc && x.doc !== x.nome ? (x.doc.length === 14 ? `CNPJ ${x.doc}` : `CPF ${x.doc}`) : null].filter(Boolean).join(' · ')])}
+      ${tabela('Maiores doadores', c.doadores, [(x) => x.nome ?? x.doc, (x) => [x.origem, documento(x.doc, x.nome)].filter(Boolean).join(' · ')])}
       ${tabela('Com o que gastou', c.despesas, [(x) => x.categoria, (x) => `${x.qtd} despesa(s)`])}
-      ${tabela('Maiores fornecedores', c.fornecedores, [(x) => x.nome ?? x.doc, (x) => (x.doc && x.doc.length === 14 ? `CNPJ ${x.doc}` : null)])}
+      ${tabela('Maiores fornecedores', c.fornecedores, [(x) => x.nome ?? x.doc, (x) => documento(x.doc, x.nome)])}
       <p class="meta">Fonte: <a href="${esc(c.link)}" target="_blank" rel="noopener">TSE – Prestação de Contas Eleitorais ${c.ano}</a></p>
     </details>`).join('');
   return `<section class="cartao">
