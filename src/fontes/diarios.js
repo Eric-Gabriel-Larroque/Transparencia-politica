@@ -1,5 +1,5 @@
 // Querido Diário (Open Knowledge Brasil): busca em diários oficiais municipais.
-// API pública: https://api.queridodiario.ok.org.br/docs
+// API pública: https://api.queridodiario.org.br/docs
 //
 // Só para quem disputou cargo municipal (prefeito, vice-prefeito, vereador): procura o nome completo,
 // entre aspas, nos diários oficiais do município da candidatura mais recente.
@@ -7,7 +7,7 @@
 
 import { httpJson, normalizar } from '../lib/util.js';
 
-const API = 'https://api.queridodiario.ok.org.br';
+const API = 'https://api.queridodiario.org.br';
 const MUNICIPAIS = /PREFEITO|VEREADOR/i;
 
 const cacheCidades = new Map();
