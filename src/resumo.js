@@ -130,7 +130,7 @@ export function montarResumo(p, fontes, { financiamento = [] } = {}) {
     const k = emp.contagem;
     linhas.push({
       tipo: k.sancionadas ? 'aviso' : 'empresas',
-      texto: `Sócio(a) de ${k.total} empresa(s) segundo a Receita Federal${k.consultadas ? `; ${k.comDinheiroFederal} com contratos, pagamentos ou convênios do governo federal${k.sancionadas ? ` e ${k.sancionadas} sancionada(s)` : ''}` : ''}.`,
+      texto: `Sócio(a) de ${k.total} empresa(s) segundo a Receita Federal${k.consultadas ? `; das ${k.consultadas}${k.consultadas < k.total ? ' de maior capital' : ''} verificadas, ${k.comDinheiroFederal} têm contratos, pagamentos ou convênios do governo federal${k.sancionadas ? ` e ${k.sancionadas} está(ão) sancionada(s)` : ''}` : ''}.`,
       detalhe: 'Ser sócio de empresa que tem contrato público não é irregular por si só. Veja cada empresa na seção "Empresas".',
       fonte: 'Receita/CGU',
       link: emp.link,

@@ -4,7 +4,7 @@
 // Aceitamos o sócio quando o nome completo é idêntico E os 6 dígitos visíveis batem com o CPF divulgado
 // pelo TSE: a chance de duas pessoas com o mesmo nome terem esses mesmos 6 dígitos é desprezível.
 
-import { httpJson } from '../lib/util.js';
+import { http } from '../lib/util.js';
 
 const CGU = 'https://api.portaldatransparencia.gov.br/api-de-dados';
 const chave = () => process.env.CHAVE_PORTAL_TRANSPARENCIA;
@@ -22,6 +22,20 @@ export function cnpjMatriz(basico) {
   const d2 = dv(base + d1);
   return `${base}${d1}${d2}`;
 }
+/**
+ * Situação da empresa no Portal da Transparência. A API responde 200 com corpo vazio quando o CNPJ
+ * não aparece em nenhum cadastro federal: isso significa "nada consta", não erro.
+ */
+async function situacaoFederal(cnpj) {
+  try {
+    const res = await http(`${CGU}/pessoa-juridica?cnpj=${cnpj}`, { headers: { 'chave-api-dados': chave(), Accept: 'application/json' } });
+    const texto = (await res.text()).trim();
+    return texto ? JSON.parse(texto) : {};
+  } catch {
+    return null; // falha de rede/limite: não afirma nada sobre a empresa
+  }
+}
+
 const formatarCnpj = (c) => c.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
 
 export const empresas = {
@@ -42,8 +56,7 @@ export const empresas = {
 
     // Situação de cada empresa no governo federal (até 15 empresas por consulta).
     const situacoes = chave()
-      ? await Promise.all(lista.slice(0, 15).map((x) => httpJson(`${CGU}/pessoa-juridica?cnpj=${cnpjMatriz(x.cnpj_basico)}`,
-        { headers: { 'chave-api-dados': chave() } }).then((r) => r.dados).catch(() => null)))
+      ? await Promise.all(lista.slice(0, 15).map((x) => situacaoFederal(cnpjMatriz(x.cnpj_basico))))
       : [];
 
     let comDinheiroFederal = 0;

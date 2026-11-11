@@ -94,7 +94,7 @@ main, .topo, .rodape { max-width: 920px; margin: 0 auto; padding: 0 16px; }
 .etiqueta.cpf { background: var(--ok-fundo); color: var(--ok); border-color: transparent; }
 .etiqueta.erro { background: var(--alerta-fundo); color: var(--alerta); border-color: transparent; }
 
-.indicadores { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 8px 0 12px; }
+.indicadores { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 8px 0 12px; }
 .indicador { border: 1px solid var(--borda); border-radius: 8px; padding: 10px 12px; }
 .indicador .valor { font-size: 1.2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .indicador .rotulo { font-size: .85rem; color: var(--suave); }
