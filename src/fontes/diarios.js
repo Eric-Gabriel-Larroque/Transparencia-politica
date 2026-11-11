@@ -34,6 +34,18 @@ export const diarios = {
     ? 'Só se aplica a quem disputou cargo municipal (prefeito, vice-prefeito ou vereador).'
     : 'Temporariamente desativada: o serviço do Querido Diário não está aceitando conexões do nosso servidor.'),
   async consultar(p) {
+    try {
+      return await consultarDiarios(p);
+    } catch (e) {
+      // Serviço externo fora do ar: mostra aviso discreto na seção, sem marcar o resumo como incompleto.
+      console.error('[diarios]', e.message);
+      return { naoAplicavel: true, motivo: 'O serviço do Querido Diário está temporariamente fora do ar. Tente de novo mais tarde.' };
+    }
+  },
+};
+
+async function consultarDiarios(p) {
+  {
     const municipal = p.candidaturas.find((c) => MUNICIPAIS.test(c.cargo ?? ''));
     const cidade = await territorio(municipal.unidade, municipal.uf);
     if (!cidade) {
@@ -67,5 +79,5 @@ export const diarios = {
         link: g.url ?? g.txt_url ?? link,
       })),
     };
-  },
-};
+  }
+}
