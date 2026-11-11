@@ -12,8 +12,9 @@ import { tse, tcu } from './fontes/locais.js';
 import { cnj } from './fontes/cnj.js';
 import { camara, senado } from './fontes/legislativo.js';
 import { cgu } from './fontes/cgu.js';
+import { djen } from './fontes/djen.js';
 
-const FONTES = [tse, tcu, cnj, cgu, camara, senado];
+const FONTES = [tse, tcu, cnj, djen, cgu, camara, senado];
 const PORTA = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || undefined; // em produção: 127.0.0.1 (atrás do Caddy)
 const LIMITE_POR_MINUTO = Number(process.env.LIMITE_POR_MINUTO) || 20;
@@ -34,8 +35,12 @@ function buscar(q) {
   const termos = normalizar(q).split(' ').filter((t) => t.length >= 2).slice(0, 6);
   if (!termos.length) return [];
   const where = termos.map(() => 'busca LIKE ?').join(' AND ');
-  return db.prepare(`SELECT * FROM pessoas WHERE ${where}
-    ORDER BY eleito DESC, ultimo_ano DESC, candidaturas DESC LIMIT 30`).all(...termos.map((t) => `%${t}%`));
+  const linhas = db.prepare(`SELECT * FROM pessoas WHERE ${where}
+    ORDER BY eleito DESC, ultimo_ano DESC, candidaturas DESC LIMIT 300`).all(...termos.map((t) => `%${t}%`));
+  // Quem tem nome de urna ou nome completo exatamente igual ao digitado vem primeiro.
+  const exato = termos.join(' ');
+  const ehExato = (r) => normalizar(r.nome) === exato || (r.urnas ?? '').split(',').some((u) => normalizar(u) === exato);
+  return [...linhas.filter(ehExato), ...linhas.filter((r) => !ehExato(r))].slice(0, 30);
 }
 
 function resumirPessoa(r) {

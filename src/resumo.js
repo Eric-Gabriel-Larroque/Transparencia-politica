@@ -6,7 +6,8 @@ const plural = (n, um, varios) => `${n.toLocaleString('pt-BR')} ${n === 1 ? um :
 
 /** O que a ficha NÃO consulta. Aparece sempre, para "nada encontrado" não ser lido como "ficha limpa". */
 export const NAO_COBRE = [
-  'Processos e condenações criminais (STF, STJ, tribunais regionais federais e tribunais de justiça estaduais). Não existe base pública unificada desses dados.',
+  'Condenações criminais confirmadas por CPF: não existe base pública unificada. A seção do Diário de Justiça mostra processos publicados desde 2024, mas só pelo nome (pode haver homônimos) e sem os processos em sigilo.',
+  'Processos no STF: o portal do Supremo bloqueia consultas automáticas.',
   'Inelegibilidade declarada pela Justiça Eleitoral em ações próprias (como AIJE), quando a pessoa não se candidatou depois da decisão.',
   'Tribunais de contas estaduais e municipais.',
   'Candidaturas anteriores a 2018.',
@@ -89,6 +90,22 @@ export function montarResumo(p, fontes) {
         detalhe: 'Pode ser homônimo. Abra cada registro na fonte oficial antes de tirar conclusões.',
       });
     }
+  }
+
+  // Processos no Diário de Justiça (sempre só por nome: vira aviso, nunca alerta)
+  const dj = fonte('djen');
+  if (dj?.status === 'ok') {
+    const c = dj.contagem ?? { total: 0, criminal: 0, improbidade: 0 };
+    linhas.push(c.total ? {
+      tipo: 'aviso',
+      texto: `${c.total} processo(s) com publicação no Diário de Justiça desde 2024 em nome de alguém com o mesmo nome completo${c.criminal ? `, ${c.criminal} de classe criminal` : ''}${c.improbidade ? `, ${c.improbidade} de improbidade/ação civil pública` : ''}.`,
+      detalhe: 'Sem CPF para confirmar que é a mesma pessoa. Aparecer num processo não significa culpa. Veja a lista na seção do Diário de Justiça.',
+      fonte: 'DJEN', link: dj.link,
+    } : {
+      tipo: 'limpo',
+      texto: 'Nenhuma publicação no Diário de Justiça desde 2024 com esse nome completo (processos em sigilo não aparecem).',
+      fonte: 'DJEN', link: dj.link,
+    });
   }
 
   // Atuação parlamentar
