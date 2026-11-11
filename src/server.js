@@ -18,8 +18,11 @@ import { cnj } from './fontes/cnj.js';
 import { camara, senado } from './fontes/legislativo.js';
 import { cgu } from './fontes/cgu.js';
 import { djen } from './fontes/djen.js';
+import { carregarFinanciamento } from './fontes/financiamento.js';
+import { empresas } from './fontes/empresas.js';
+import { diarios } from './fontes/diarios.js';
 
-const FONTES = [tse, tcu, cnj, djen, cgu, camara, senado];
+const FONTES = [tse, tcu, cnj, djen, cgu, empresas, camara, senado, diarios];
 const PORTA = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || undefined; // em produção: 127.0.0.1 (atrás do Caddy)
 const LIMITE_POR_MINUTO = Number(process.env.LIMITE_POR_MINUTO) || 20;
@@ -115,6 +118,7 @@ async function perfil(id) {
   const p = carregarPessoa(id);
   if (!p) return null;
   const fontes = await consultarFontes(p);
+  const financiamento = carregarFinanciamento(db, p.candidaturas);
   const dados = {
     pessoa: {
       id: p.id, nome: p.nome, urnas: p.urnas, cargos: p.cargos, cpf: mascararCpf(p.cpf), nascimento: p.nascimento,
@@ -124,7 +128,8 @@ async function perfil(id) {
       ano: c.ano, cargo: c.cargo, unidade: c.unidade, uf: c.uf, partido: c.partido, numero: c.numero, urna: c.urna,
       resultado: c.resultado, situacao: c.detalhe_situacao ?? c.situacao, bens: c.bens_total,
     })),
-    resumo: montarResumo(p, fontes),
+    resumo: montarResumo(p, fontes, { financiamento }),
+    financiamento,
     naoCobre: NAO_COBRE,
     bens: fontes.find((f) => f.id === 'tse')?.bens ?? [],
     fontes,

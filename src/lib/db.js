@@ -58,6 +58,23 @@ CREATE TABLE IF NOT EXISTS bens (
 CREATE TABLE IF NOT EXISTS camara_deputados (
   id INTEGER PRIMARY KEY, nome TEXT, nome_civil TEXT, nome_norm TEXT, nascimento TEXT, leg_ini INTEGER, leg_fim INTEGER
 );
+-- Financiamento de campanha (TSE, prestação de contas), já somado por candidatura.
+CREATE TABLE IF NOT EXISTS fin_fonte (ano INTEGER, sq TEXT, fonte TEXT, total REAL, qtd INTEGER, PRIMARY KEY (ano, sq, fonte));
+CREATE TABLE IF NOT EXISTS fin_origem (ano INTEGER, sq TEXT, origem TEXT, total REAL, qtd INTEGER, PRIMARY KEY (ano, sq, origem));
+CREATE TABLE IF NOT EXISTS fin_doador (ano INTEGER, sq TEXT, doc TEXT, nome TEXT, origem TEXT, total REAL, qtd INTEGER, PRIMARY KEY (ano, sq, doc));
+CREATE TABLE IF NOT EXISTS fin_despesa (ano INTEGER, sq TEXT, categoria TEXT, total REAL, qtd INTEGER, PRIMARY KEY (ano, sq, categoria));
+CREATE TABLE IF NOT EXISTS fin_fornecedor (ano INTEGER, sq TEXT, doc TEXT, nome TEXT, total REAL, qtd INTEGER, PRIMARY KEY (ano, sq, doc));
+-- Votações nominais do Plenário da Câmara (desde 2019).
+CREATE TABLE IF NOT EXISTS cam_votacao (
+  id TEXT PRIMARY KEY, data TEXT, descricao TEXT, aprovacao INTEGER, prop_id TEXT, proposicao TEXT, sigla_tipo TEXT,
+  ementa TEXT, orient_gov TEXT
+);
+CREATE TABLE IF NOT EXISTS cam_voto (id_votacao TEXT, dep_id INTEGER, voto TEXT, partido TEXT);
+-- Cota parlamentar do Senado (CEAPS), somada por senador (nome parlamentar), ano e tipo de despesa.
+CREATE TABLE IF NOT EXISTS sen_ceaps (ano INTEGER, senador TEXT, tipo TEXT, total REAL, qtd INTEGER, PRIMARY KEY (ano, senador, tipo));
+-- Empresas das quais o político é sócio (Receita Federal, quadro de sócios), cruzadas por nome + 6 dígitos do CPF.
+CREATE TABLE IF NOT EXISTS empresa_socio (cpf TEXT, cnpj_basico TEXT, qualificacao TEXT, data_entrada TEXT);
+CREATE TABLE IF NOT EXISTS empresa (cnpj_basico TEXT PRIMARY KEY, razao_social TEXT, natureza TEXT, capital REAL, porte TEXT);
 CREATE TABLE IF NOT EXISTS meta (chave TEXT PRIMARY KEY, valor TEXT);
 `;
 
@@ -72,6 +89,10 @@ export function abrirBanco({ escrita = false, caminho = CAMINHO_DB } = {}) {
 }
 
 /** Página do conjunto de dados de candidatos do TSE de cada ano (fonte oficial dos bens). */
+export function linkContasTse(ano) {
+  return `https://dadosabertos.tse.jus.br/dataset/prestacao-de-contas-eleitorais-${ano}`;
+}
+
 export function linkDadosTse(ano) {
   const slug = Number(ano) === 2020 ? 'candidatos-2020-subtemas' : `candidatos-${ano}`;
   return `https://dadosabertos.tse.jus.br/dataset/${slug}`;

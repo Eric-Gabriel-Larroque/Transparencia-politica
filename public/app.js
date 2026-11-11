@@ -62,6 +62,7 @@ async function buscar(q) {
 function etiquetaCorrespondencia(c) {
   if (c === 'cpf') return '<span class="etiqueta cpf" title="Cruzamento exato pelo CPF">por CPF</span>';
   if (c === 'nome') return '<span class="etiqueta nome" title="Cruzamento pelo nome: pode haver homônimos">por nome</span>';
+  if (c === 'nome_cpf_parcial') return '<span class="etiqueta cpf" title="Nome completo idêntico e 6 dígitos do CPF (os que a Receita deixa visíveis) iguais">por nome e CPF parcial</span>';
   if (c === 'nome_nascimento') return '<span class="etiqueta cpf" title="Cruzamento pelo nome civil completo e pela data de nascimento">por nome e nascimento</span>';
   return '';
 }
@@ -96,9 +97,13 @@ function blocoFonte(f) {
   const outros = f.registrosOutros?.length ? `<details class="outros"><summary>${esc(f.tituloOutros)}</summary>
       <ul class="registros">${f.registrosOutros.map(item).join('')}</ul></details>` : '';
 
-  const vazio = !indicadores && !registros && !outros ? '<p class="caixa neutra">Nenhum registro encontrado nesta fonte.</p>' : '';
+  const extras = (f.listasExtras ?? []).map((l) => l.recolhido
+    ? `<details class="outros"><summary>${esc(l.titulo)}</summary><ul class="registros">${l.registros.map(item).join('')}</ul></details>`
+    : `<h3 class="meta">${esc(l.titulo)}</h3><ul class="registros">${l.registros.slice(0, 5).map(item).join('')}</ul>
+       ${l.registros.length > 5 ? `<details><summary>Ver todos os ${l.registros.length}</summary><ul class="registros">${l.registros.slice(5).map(item).join('')}</ul></details>` : ''}`).join('');
+  const vazio = !indicadores && !registros && !outros && !extras ? '<p class="caixa neutra">Nenhum registro encontrado nesta fonte.</p>' : '';
   const aviso = f.aviso ? `<p class="caixa aviso">${esc(f.aviso)}</p>` : '';
-  return `<section class="cartao">${cab}<p class="meta">${esc(f.descricao)}</p>${aviso}${indicadores}${registros}${outros}${vazio}</section>`;
+  return `<section class="cartao">${cab}<p class="meta">${esc(f.descricao)}</p>${aviso}${indicadores}${extras}${registros}${outros}${vazio}</section>`;
 }
 
 function blocoBens(bens) {
@@ -119,6 +124,38 @@ function blocoBens(bens) {
       com o valor de cada um. Os valores abaixo são exatamente os que o próprio candidato informou: não são auditados,
       costumam seguir o valor de compra (não o de mercado) e não têm correção pela inflação. Toque em um ano para ver a lista.</p>
     ${linhas}
+  </section>`;
+}
+
+function blocoFinanciamento(lista) {
+  if (!lista?.length) return '';
+  const tabela = (titulo, linhas, colunas) => linhas.length ? `
+    <h3 class="meta">${titulo}</h3>
+    <ul class="lista-bens">${linhas.map((l) => `<li><div><div>${esc(colunas[0](l))}</div>${colunas[1] ? `<div class="meta">${esc(colunas[1](l) ?? '')}</div>` : ''}</div>
+      <div class="bens-valor">${brl(l.total)}</div></li>`).join('')}</ul>` : '';
+  const anos = lista.map((c, i) => `
+    <details class="bens-ano" ${i === 0 ? 'open' : ''}>
+      <summary><span class="bens-titulo">${c.ano} · ${esc(capitalizar(c.cargo))}${c.unidade ? ` (${esc(capitalizar(c.unidade))})` : ''}</span>
+        <span class="bens-total">${brl(c.arrecadado)}</span></summary>
+      <div class="indicadores">
+        <div class="indicador"><div class="valor">${brl(c.arrecadado)}</div><div class="rotulo">Arrecadado</div></div>
+        <div class="indicador"><div class="valor">${c.percentualPublico}%</div><div class="rotulo">Dinheiro público</div><div class="rotulo">${brl(c.publico)}</div></div>
+        <div class="indicador"><div class="valor">${brl(c.gasto)}</div><div class="rotulo">Gastos contratados</div></div>
+      </div>
+      ${tabela('De onde veio o dinheiro', c.fontes, [(x) => x.nome])}
+      ${tabela('Por origem', c.origens, [(x) => x.origem, (x) => `${x.qtd} receita(s)`])}
+      ${tabela('Maiores doadores', c.doadores, [(x) => x.nome ?? x.doc, (x) => [x.origem, x.doc && x.doc !== x.nome ? (x.doc.length === 14 ? `CNPJ ${x.doc}` : `CPF ${x.doc}`) : null].filter(Boolean).join(' · ')])}
+      ${tabela('Com o que gastou', c.despesas, [(x) => x.categoria, (x) => `${x.qtd} despesa(s)`])}
+      ${tabela('Maiores fornecedores', c.fornecedores, [(x) => x.nome ?? x.doc, (x) => (x.doc && x.doc.length === 14 ? `CNPJ ${x.doc}` : null)])}
+      <p class="meta">Fonte: <a href="${esc(c.link)}" target="_blank" rel="noopener">TSE – Prestação de Contas Eleitorais ${c.ano}</a></p>
+    </details>`).join('');
+  return `<section class="cartao">
+    <h2>Financiamento de campanha</h2>
+    <p class="orgao">TSE – Prestação de contas eleitorais · <a href="${esc(lista[0].link)}" target="_blank" rel="noopener">fonte oficial</a></p>
+    <p class="meta">Quanto cada campanha arrecadou, de onde veio o dinheiro, quem mais doou e com o que gastou, como o próprio candidato
+      declarou à Justiça Eleitoral. "Dinheiro público" é a soma do Fundo Eleitoral (FEFC) e do Fundo Partidário. Os valores incluem doações
+      estimáveis (bens e serviços doados). CPFs de doadores pessoas físicas aparecem mascarados.</p>
+    ${anos}
   </section>`;
 }
 
@@ -167,6 +204,8 @@ async function telaPerfil(id) {
           <td class="num">${brl(c.bens)}</td></tr>`).join('')}</tbody>
       </table></div>
     </section>
+
+    ${blocoFinanciamento(d.financiamento)}
 
     ${blocoBens(d.bens)}
 

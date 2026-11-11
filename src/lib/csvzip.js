@@ -3,6 +3,7 @@
 
 import yauzl from 'yauzl';
 import readline from 'node:readline';
+import fs from 'node:fs';
 
 function abrirZip(caminho) {
   return new Promise((resolve, reject) => {
@@ -39,6 +40,8 @@ export function dividirLinha(linha, sep = ';') {
         const k = linha.indexOf('"', j);
         if (k < 0) { valor += linha.slice(j); i = n + 1; break; }
         if (linha[k + 1] === '"') { valor += linha.slice(j, k + 1); j = k + 2; continue; }
+        // Aspas que não fecham o campo (não vêm antes do separador nem no fim) são texto: ex. "Raul"s Ltda".
+        if (k + 1 < n && linha[k + 1] !== sep) { valor += linha.slice(j, k + 1); j = k + 1; continue; }
         valor += linha.slice(j, k);
         i = k + 1;
         break;
@@ -56,6 +59,23 @@ export function dividirLinha(linha, sep = ';') {
   return campos;
 }
 
+/**
+ * Junta linhas quebradas dentro de aspas, mas no máximo MAX_JUNCAO linhas: um arquivo com uma aspa
+ * solta não pode "engolir" o resto do arquivo.
+ */
+const MAX_JUNCAO = 50;
+function* juntarLinhas(estado, bruta) {
+  estado.buffer.push(bruta);
+  const linha = estado.buffer.join('\n');
+  if (contarAspas(linha) % 2 === 0) { estado.buffer = []; yield linha; return; }
+  if (estado.buffer.length >= MAX_JUNCAO) {
+    const [primeira, ...resto] = estado.buffer;
+    estado.buffer = [];
+    yield primeira; // processa a linha problemática sozinha (leitura tolerante)
+    for (const r of resto) yield* juntarLinhas(estado, r);
+  }
+}
+
 function contarAspas(s) {
   let c = 0;
   for (let i = s.indexOf('"'); i >= 0; i = s.indexOf('"', i + 1)) c++;
@@ -67,10 +87,10 @@ function contarAspas(s) {
  * Se existir um arquivo *_BRASIL.csv, lê só ele (ele já junta todas as UFs);
  * caso contrário lê todos os .csv.
  */
-export async function* linhasDoZip(caminho) {
+export async function* linhasDoZip(caminho, { arquivo, colunas } = {}) {
   const zip = await abrirZip(caminho);
   try {
-    const csvs = (await listarEntradas(zip)).filter((e) => /\.csv$/i.test(e.fileName));
+    const csvs = (await listarEntradas(zip)).filter((e) => (arquivo ? arquivo.test(e.fileName) : /\.csv$/i.test(e.fileName)));
     const brasil = csvs.filter((e) => /_BRASIL\.csv$/i.test(e.fileName));
     const alvo = brasil.length ? brasil : csvs;
 
@@ -78,22 +98,42 @@ export async function* linhasDoZip(caminho) {
       const stream = await abrirEntrada(zip, entrada);
       stream.setEncoding('latin1');
       const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
-      let cabecalho = null;
-      let pendente = '';
+      let cabecalho = colunas ?? null; // arquivos sem cabeçalho (ex.: Receita) recebem os nomes das colunas
+      const estado = { buffer: [] };
       for await (const bruta of rl) {
-        // Campo com quebra de linha dentro de aspas: junta até fechar as aspas.
-        const linha = pendente ? `${pendente}\n${bruta}` : bruta;
-        if (contarAspas(linha) % 2 === 1) { pendente = linha; continue; }
-        pendente = '';
-        if (!linha) continue;
-        const campos = dividirLinha(linha);
-        if (!cabecalho) { cabecalho = campos; continue; }
-        const obj = {};
-        for (let c = 0; c < cabecalho.length; c++) obj[cabecalho[c]] = campos[c];
-        yield obj;
+        // Campo com quebra de linha dentro de aspas: junta até fechar as aspas (com limite).
+        for (const linha of juntarLinhas(estado, bruta)) {
+          if (!linha) continue;
+          const campos = dividirLinha(linha);
+          if (!cabecalho) { cabecalho = campos; continue; }
+      if (campos.length < cabecalho.length / 2) continue; // fragmento de linha malformada
+          if (campos.length < cabecalho.length / 2) continue; // fragmento de linha malformada
+          const obj = {};
+          for (let c = 0; c < cabecalho.length; c++) obj[cabecalho[c]] = campos[c];
+          yield obj;
+        }
       }
     }
   } finally {
     zip.close();
+  }
+}
+
+/** Itera as linhas (como objetos) de um CSV comum (UTF-8, separado por ";"), em streaming. */
+export async function* linhasDoCsv(caminho, { encoding = 'utf8', pular = 0 } = {}) {
+  const rl = readline.createInterface({ input: fs.createReadStream(caminho, { encoding }), crlfDelay: Infinity });
+  let cabecalho = null;
+  const estado = { buffer: [] };
+  for await (const bruta of rl) {
+    for (const linha of juntarLinhas(estado, bruta)) {
+      if (!linha) continue;
+      if (pular > 0) { pular--; continue; }
+      const campos = dividirLinha(cabecalho ? linha : linha.replace(/^\uFEFF/, ''));
+      if (!cabecalho) { cabecalho = campos; continue; }
+      if (campos.length < cabecalho.length / 2) continue; // fragmento de linha malformada
+      const obj = {};
+      for (let c = 0; c < cabecalho.length; c++) obj[cabecalho[c]] = campos[c];
+      yield obj;
+    }
   }
 }

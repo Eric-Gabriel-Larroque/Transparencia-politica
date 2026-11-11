@@ -10,6 +10,7 @@ export const NAO_COBRE = [
   'Processos no STF: o portal do Supremo bloqueia consultas automáticas.',
   'Inelegibilidade declarada pela Justiça Eleitoral em ações próprias (como AIJE), quando a pessoa não se candidatou depois da decisão.',
   'Tribunais de contas estaduais e municipais.',
+  'Contratos de empresas com estados e prefeituras: a situação das empresas cobre só o governo federal.',
   'Candidaturas anteriores a 2018.',
 ];
 
@@ -25,7 +26,7 @@ const FRASES = {
     'Nenhuma sanção administrativa no Portal da Transparência (CEIS, CNEP, CEAF)'],
 };
 
-export function montarResumo(p, fontes) {
+export function montarResumo(p, fontes, { financiamento = [] } = {}) {
   const linhas = [];
   const fonte = (id) => fontes.find((f) => f.id === id);
   const c = p.candidaturas;
@@ -61,6 +62,19 @@ export function montarResumo(p, fontes) {
       detalhe: 'Soma dos bens que o próprio candidato declarou ao registrar a candidatura.',
       fonte: 'TSE',
       link: bens[0].link,
+    });
+  }
+
+  // Financiamento da campanha mais recente com prestação de contas
+  const camp = financiamento[0];
+  if (camp) {
+    const maior = camp.doadores[0];
+    linhas.push({
+      tipo: 'financiamento',
+      texto: `Campanha de ${camp.ano} (${camp.cargo}): arrecadou ${brl(camp.arrecadado)}, dos quais ${camp.percentualPublico}% vieram de dinheiro público (Fundo Eleitoral e Fundo Partidário)${maior ? `. Maior doador: ${maior.nome} (${brl(maior.total)})` : ''}.`,
+      detalhe: 'Como declarado na prestação de contas ao TSE. Inclui doações estimáveis (bens e serviços). Veja doadores e gastos na seção "Financiamento de campanha".',
+      fonte: 'TSE',
+      link: camp.link,
     });
   }
 
@@ -107,6 +121,19 @@ export function montarResumo(p, fontes) {
       texto: `Nenhuma publicação no Diário de Justiça desde 2024 com esse nome completo em tribunais de ${k.onde} (processos em sigilo não aparecem).`,
       detalhe: k.outros ? `Há ${k.outros} processo(s) com o mesmo nome em outros estados, provavelmente de outras pessoas.` : null,
       fonte: 'DJEN', link: dj.link,
+    });
+  }
+
+  // Empresas (Receita + CGU)
+  const emp = fonte('empresas');
+  if (emp?.status === 'ok' && emp.contagem?.total) {
+    const k = emp.contagem;
+    linhas.push({
+      tipo: k.sancionadas ? 'aviso' : 'empresas',
+      texto: `Sócio(a) de ${k.total} empresa(s) segundo a Receita Federal${k.consultadas ? `; ${k.comDinheiroFederal} com contratos, pagamentos ou convênios do governo federal${k.sancionadas ? ` e ${k.sancionadas} sancionada(s)` : ''}` : ''}.`,
+      detalhe: 'Ser sócio de empresa que tem contrato público não é irregular por si só. Veja cada empresa na seção "Empresas".',
+      fonte: 'Receita/CGU',
+      link: emp.link,
     });
   }
 

@@ -113,14 +113,7 @@ OnUnitActiveSec=5min
 [Install]
 WantedBy=timers.target
 EOF
-cat > /etc/systemd/system/ficha-publica-indexar.service <<EOF
-[Unit]
-Description=Ficha Publica: reconstroi o indice (TSE + TCU)
-
-[Service]
-Type=oneshot
-ExecStart=/bin/bash -c 'rm -rf $PASTA/data/brutos && sudo -u $USUARIO npm --prefix $PASTA run indexar && systemctl restart ficha-publica'
-EOF
+cp "$PASTA/deploy/systemd/ficha-publica-indexar.service" /etc/systemd/system/
 cat > /etc/systemd/system/ficha-publica-indexar.timer <<EOF
 [Unit]
 Description=Ficha Publica: reconstroi o indice toda segunda de madrugada

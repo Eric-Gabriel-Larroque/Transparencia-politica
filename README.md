@@ -8,20 +8,27 @@ por regras fixas (contagens, somas, comparações).
 
 | Fonte | O que traz | Como é consultada | Cruzamento |
 |---|---|---|---|
-| **TSE** | Candidaturas, resultado, registro indeferido/cassado e motivo, bens declarados | Arquivos de dados abertos, baixados para o índice local | — (é a base de identidade) |
-| **TCU** | Contas julgadas irregulares, implicação eleitoral, inabilitados, inidôneos | API pública das listas, baixada para o índice local | CPF (ou nome + UF quando o TSE não divulgou o CPF) |
-| **CNJ** | Condenações por improbidade administrativa e inelegibilidade | Consulta pública ao vivo | CPF + nome completo idêntico (marcado como possível homônimo) |
-| **Câmara** | Proposições de autoria, gastos da cota parlamentar | API de dados abertos, ao vivo | CPF |
-| **Senado** | Matérias de autoria | API de dados abertos, ao vivo | Nome completo (o Senado não publica CPF) |
-| **CGU** | CEIS, CNEP, CEAF, pessoas expostas politicamente, emendas | API do Portal da Transparência, ao vivo (**precisa de chave**) | CPF; emendas por nome parlamentar |
+| **TSE – candidaturas** | Candidaturas, resultado, registro indeferido/cassado e motivo, bens declarados (item a item) | Dados abertos, índice local | — (é a base de identidade) |
+| **TSE – prestação de contas** | Quanto cada campanha arrecadou, % de dinheiro público, maiores doadores, gastos e fornecedores | Dados abertos, índice local (somado por candidatura) | Número da candidatura |
+| **TCU** | Contas julgadas irregulares, implicação eleitoral, inabilitados, inidôneos | API pública das listas, índice local | CPF (ou nome + UF sem CPF) |
+| **CNJ – improbidade** | Condenações cíveis por improbidade administrativa e inelegibilidade | Consulta pública ao vivo | CPF + nome completo (homônimo marcado) |
+| **CNJ – DJEN** | Processos com publicação no Diário de Justiça desde 2024, em qualquer tribunal | API pública ao vivo (só responde a IPs do Brasil, por IPv4) | Nome completo; separa por estado de origem do processo |
+| **Câmara** | Mandatos desde 1983, proposições, cota parlamentar, votações nominais do Plenário desde 2019 (participação, alinhamento com o governo, votos em PECs) | API e arquivos de dados abertos | Nome civil + data de nascimento |
+| **Senado** | Mandatos desde 1983, matérias, votações nominais, cota parlamentar (CEAPS) | API e arquivos de dados abertos | Nome civil + data de nascimento |
+| **CGU** | CEIS, CNEP, CEAF, pessoas expostas politicamente, emendas; situação federal das empresas | API do Portal da Transparência (**precisa de chave**) | CPF / CNPJ |
+| **Receita Federal** | Empresas das quais a pessoa é sócia | Quadro de sócios (dados abertos), índice local | Nome completo + 6 dígitos visíveis do CPF |
+| **Querido Diário** | Menções em diários oficiais municipais (só cargos municipais) | API pública ao vivo | Nome completo no município da candidatura |
+
+Fora do alcance (bloqueio anti-robô, sem API ou pago): STF, certidões criminais do DivulgaCandContas, tribunais de contas
+estaduais, APIs jurídicas comerciais.
 
 ## Como rodar
 
-Requisitos: **Node.js 22.13 ou mais novo** e cerca de 1,2 GB livres em disco.
+Requisitos: **Node.js 22.13 ou mais novo** e cerca de 15 GB livres em disco (arquivos brutos + índice).
 
 ```bash
 npm install
-npm run indexar   # baixa TSE (2018–2026) + TCU e monta data/indice.db (~3 min)
+npm run indexar   # baixa TSE, TCU, Câmara, Senado e Receita e monta data/indice.db (30–60 min na 1ª vez)
 npm start         # http://localhost:3000
 ```
 

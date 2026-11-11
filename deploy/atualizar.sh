@@ -21,5 +21,8 @@ sudo -u "$USUARIO" git reset -q --hard origin/main
 # Se o formato do índice mudou, reconstrói antes de reiniciar (o site antigo segue no ar enquanto isso).
 [ -n "$MUDOU_INDICE" ] && sudo -u "$USUARIO" npm run indexar
 
+# Mantém as definições de serviço em dia com o repositório.
+cp "$PASTA"/deploy/systemd/*.service /etc/systemd/system/ 2>/dev/null && systemctl daemon-reload
+
 systemctl restart ficha-publica
 echo "Atualizado."

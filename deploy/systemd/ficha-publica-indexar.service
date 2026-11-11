@@ -1,0 +1,6 @@
+[Unit]
+Description=Ficha Publica: reconstroi o indice (TSE, TCU, Camara, Senado, Receita)
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c 'sudo -u ficha npm --prefix /opt/ficha-publica run indexar && systemctl restart ficha-publica'
