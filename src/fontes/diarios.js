@@ -28,8 +28,11 @@ export const diarios = {
   nome: 'Menções em diários oficiais do município',
   orgao: 'Querido Diário (Open Knowledge Brasil)',
   descricao: 'Publicações nos diários oficiais da prefeitura em que aparece o nome completo da pessoa: nomeações, contratos, portarias, decretos. Aparecer no diário oficial é comum e não indica irregularidade.',
-  aplicavel: (p) => p.candidaturas.some((c) => MUNICIPAIS.test(c.cargo ?? '')),
-  motivoNaoAplicavel: 'Só se aplica a quem disputou cargo municipal (prefeito, vice-prefeito ou vereador).',
+  // Desligada por padrão: a API recusou a conexão TLS a partir do servidor (nov/2026). Ligar com QUERIDO_DIARIO=1.
+  aplicavel: (p) => process.env.QUERIDO_DIARIO === '1' && p.candidaturas.some((c) => MUNICIPAIS.test(c.cargo ?? '')),
+  motivoNaoAplicavel: () => (process.env.QUERIDO_DIARIO === '1'
+    ? 'Só se aplica a quem disputou cargo municipal (prefeito, vice-prefeito ou vereador).'
+    : 'Temporariamente desativada: o serviço do Querido Diário não está aceitando conexões do nosso servidor.'),
   async consultar(p) {
     const municipal = p.candidaturas.find((c) => MUNICIPAIS.test(c.cargo ?? ''));
     const cidade = await territorio(municipal.unidade, municipal.uf);
