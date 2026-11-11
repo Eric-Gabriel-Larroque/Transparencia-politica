@@ -206,9 +206,11 @@ function montarPessoas(db) {
 
 async function main() {
   fs.mkdirSync(PASTA_BRUTOS, { recursive: true });
-  // Recria o índice do zero a cada execução (os brutos baixados são reaproveitados).
-  for (const sufixo of ['', '-wal', '-shm']) fs.rmSync(CAMINHO_DB + sufixo, { force: true });
-  const db = abrirBanco({ escrita: true });
+  // Monta o índice num arquivo novo e só troca pelo atual no final,
+  // para o site continuar no ar durante a atualização.
+  const NOVO = `${CAMINHO_DB}.novo`;
+  for (const sufixo of ['', '-wal', '-shm']) fs.rmSync(NOVO + sufixo, { force: true });
+  const db = abrirBanco({ escrita: true, caminho: NOVO });
   db.exec(ESQUEMA);
 
   for (const ano of ANOS) {
@@ -225,7 +227,10 @@ async function main() {
   const meta = db.prepare('INSERT OR REPLACE INTO meta (chave, valor) VALUES (?, ?)');
   meta.run('atualizado_em', new Date().toISOString());
   meta.run('anos', ANOS.join(','));
+  db.exec('PRAGMA journal_mode = DELETE;'); // junta o WAL no arquivo principal
   db.close();
+  fs.renameSync(NOVO, CAMINHO_DB);
+  for (const sufixo of ['-wal', '-shm']) fs.rmSync(CAMINHO_DB + sufixo, { force: true });
   log('pronto:', CAMINHO_DB);
 }
 

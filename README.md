@@ -28,6 +28,31 @@ npm start         # http://localhost:3000
 Para indexar só alguns anos: `ANOS=2022,2024 npm run indexar`.
 Rode `npm run indexar` de novo de tempos em tempos para atualizar as listas do TCU.
 
+## Publicar num VPS (Ubuntu 24.04)
+
+No terminal do servidor, como root:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Eric-Gabriel-Larroque/Transparencia-politica/main/deploy/instalar.sh | bash
+```
+
+O script instala Node 22 e Caddy, baixa o código em `/opt/ficha-publica`, pede a chave da CGU, monta o
+índice e deixa o site no ar em `http://IP-DO-SERVIDOR`. Depois:
+
+- **Código:** a cada 5 minutos o servidor confere o GitHub; se houver commit novo em `main`, atualiza e reinicia sozinho.
+- **Dados:** toda segunda às 04:17 o índice do TSE/TCU é reconstruído (o site continua no ar durante a reconstrução).
+- **Domínio com HTTPS:** aponte o DNS (registro A de `@` e `www`) para o IP do servidor e rode de novo:
+  `curl -fsSL .../deploy/instalar.sh | DOMINIO=seudominio.com.br bash`
+
+Comandos úteis no servidor:
+
+```bash
+journalctl -u ficha-publica -f                  # log do site
+journalctl -u ficha-publica-atualizar -n 20     # últimas atualizações automáticas
+systemctl restart ficha-publica                 # reiniciar o site
+nano /opt/ficha-publica/.env                    # trocar a chave da CGU (depois reinicie)
+```
+
 ## Chave do Portal da Transparência (CGU)
 
 1. Acesse https://portaldatransparencia.gov.br/api-de-dados/cadastrar-email

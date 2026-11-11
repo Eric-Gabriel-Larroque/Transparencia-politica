@@ -55,12 +55,12 @@ CREATE TABLE IF NOT EXISTS pessoas (
 CREATE TABLE IF NOT EXISTS meta (chave TEXT PRIMARY KEY, valor TEXT);
 `;
 
-export function abrirBanco({ escrita = false } = {}) {
-  if (!escrita && !fs.existsSync(CAMINHO_DB)) {
+export function abrirBanco({ escrita = false, caminho = CAMINHO_DB } = {}) {
+  if (!escrita && !fs.existsSync(caminho)) {
     throw new Error('Índice não encontrado. Rode "npm run indexar" antes de iniciar o servidor.');
   }
   fs.mkdirSync(PASTA_DADOS, { recursive: true });
-  const db = new DatabaseSync(CAMINHO_DB, { readOnly: !escrita });
+  const db = new DatabaseSync(caminho, { readOnly: !escrita });
   if (escrita) db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = OFF;');
   return db;
 }

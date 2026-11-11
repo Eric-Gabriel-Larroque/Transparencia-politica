@@ -15,6 +15,8 @@ import { cgu } from './fontes/cgu.js';
 
 const FONTES = [tse, tcu, cnj, cgu, camara, senado];
 const PORTA = Number(process.env.PORT) || 3000;
+const HOST = process.env.HOST || undefined; // em produção: 127.0.0.1 (atrás do Caddy)
+const LIMITE_POR_MINUTO = Number(process.env.LIMITE_POR_MINUTO) || 20;
 const PUBLICO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../public');
 const CACHE_MS = 6 * 60 * 60 * 1000;
 const TIMEOUT_FONTE = 45_000;
@@ -120,6 +122,27 @@ async function perfil(id) {
   return dados;
 }
 
+// ---------------------------------------------------------------- limite de uso
+// Cada perfil consulta várias APIs externas (e gasta a chave da CGU): limita por visitante.
+
+const acessos = new Map();
+function ipDe(req) {
+  const local = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
+  const encaminhado = req.headers['x-forwarded-for']?.split(',')[0].trim();
+  return (local && encaminhado) || req.socket.remoteAddress;
+}
+function excedeuLimite(ip) {
+  const agora = Date.now();
+  const recentes = (acessos.get(ip) ?? []).filter((t) => agora - t < 60_000);
+  recentes.push(agora);
+  acessos.set(ip, recentes);
+  return recentes.length > LIMITE_POR_MINUTO;
+}
+setInterval(() => {
+  const agora = Date.now();
+  for (const [ip, ts] of acessos) if (!ts.some((t) => agora - t < 60_000)) acessos.delete(ip);
+}, 5 * 60_000).unref();
+
 // ---------------------------------------------------------------- HTTP
 
 const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml' };
@@ -138,6 +161,9 @@ const servidor = http.createServer(async (req, res) => {
     }
     const m = url.pathname.match(/^\/api\/politico\/(\d{4}-\d+)$/);
     if (m) {
+      if (!cache.has(m[1]) && excedeuLimite(ipDe(req))) {
+        return json(res, 429, { erro: 'Muitas consultas em pouco tempo. Aguarde um minuto e tente de novo.' });
+      }
       const dados = await perfil(m[1]);
       return dados ? json(res, 200, dados) : json(res, 404, { erro: 'Político não encontrado' });
     }
@@ -154,4 +180,4 @@ const servidor = http.createServer(async (req, res) => {
   }
 });
 
-servidor.listen(PORTA, () => console.log(`Pronto em http://localhost:${PORTA}`));
+servidor.listen(PORTA, HOST, () => console.log(`Pronto em http://${HOST ?? 'localhost'}:${PORTA}`));
