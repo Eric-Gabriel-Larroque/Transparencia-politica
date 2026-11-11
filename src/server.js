@@ -2,6 +2,11 @@
 // Sem dependências externas: node:http + node:sqlite.
 
 import http from 'node:http';
+import dns from 'node:dns';
+
+// Prefere IPv4 nas conexões de saída. O IPv6 da Hostinger é registrado na Europa e serviços
+// brasileiros com bloqueio por país (ex.: DJEN do CNJ) recusam esse endereço; o IPv4 é do Brasil.
+dns.setDefaultResultOrder('ipv4first');
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
