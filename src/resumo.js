@@ -123,7 +123,8 @@ export function montarResumo(p, fontes) {
   // Fontes que não responderam
   const falhas = fontes.filter((f) => f.status === 'erro');
   if (falhas.length) {
-    linhas.push({ tipo: 'aviso', texto: `Não foi possível consultar agora: ${falhas.map((f) => f.orgao.split(' – ')[0]).join(', ')}. O resumo pode estar incompleto.` });
+    const nomeCurto = (f) => (f.id === 'djen' ? 'Diário de Justiça (DJEN)' : f.orgao.split(' – ')[0]);
+    linhas.push({ tipo: 'aviso', texto: `Não foi possível consultar agora: ${falhas.map(nomeCurto).join(', ')}. O resumo pode estar incompleto.` });
   }
   return linhas;
 }

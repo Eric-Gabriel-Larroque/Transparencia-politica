@@ -97,7 +97,8 @@ async function consultarFontes(p) {
       return { ...base, status: 'ok', ms: Date.now() - inicio, ...r };
     } catch (e) {
       console.error(`[${f.id}]`, e.message);
-      return { ...base, status: 'erro', motivo: `Não foi possível consultar agora (${e.message}).` };
+      return { ...base, status: 'erro', motivo: e.mensagemPublica ?? `Não foi possível consultar agora (${e.message}).`,
+        link: f.linkConsulta?.(p) };
     }
   }));
 }

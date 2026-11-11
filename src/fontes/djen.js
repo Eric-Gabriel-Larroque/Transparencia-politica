@@ -48,7 +48,11 @@ async function buscarPublicacoes(nome) {
     try {
       res = await http(`${API}?${qs}`, { headers: { Accept: 'application/json' }, timeout: 30_000 });
     } catch (e) {
-      if (e.status === 403) throw new Error('acesso bloqueado: a API do DJEN só responde a servidores no Brasil');
+      if (e.status === 403) {
+        const erro = new Error('DJEN respondeu 403 (bloqueio por geolocalização do IP do servidor)');
+        erro.mensagemPublica = 'Temporariamente indisponível: o serviço do CNJ não está aceitando consultas do nosso servidor. Você pode consultar diretamente no site do DJEN pelo link "fonte oficial".';
+        throw erro;
+      }
       throw e;
     }
     const dados = await res.json();
@@ -66,6 +70,7 @@ export const djen = {
   orgao: 'CNJ – Diário de Justiça Eletrônico Nacional (DJEN)',
   descricao: 'Processos de qualquer tribunal do país (estaduais, federais, eleitorais, superiores) que tiveram publicação no DJEN desde 2024 com uma parte de nome idêntico. Processos em sigilo não aparecem.',
   aplicavel: () => true,
+  linkConsulta: (p) => `${CONSULTA}?nomeParte=${encodeURIComponent(p.nome_norm)}`,
   async consultar(p) {
     // A grafia nas publicações pode ter ou não acento: busca das duas formas e junta.
     const grafias = [...new Set([p.nome_norm, String(p.nome ?? '').toUpperCase().trim()].filter(Boolean))];
