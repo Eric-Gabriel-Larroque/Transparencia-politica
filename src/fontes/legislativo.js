@@ -27,25 +27,13 @@ const naoEncontrado = (casa) => ({
 
 // ---------------------------------------------------------------- Câmara
 
-// Obs.: o filtro "ano" da API de despesas devolve lista vazia (testado em nov/2026);
-// o filtro por legislatura funciona, então somamos a legislatura inteira e separamos por ano aqui.
-async function somarDespesas(id, legislatura) {
-  const url = (pagina) => `${CAMARA}/deputados/${id}/despesas?idLegislatura=${legislatura}&itens=100&pagina=${pagina}`;
-  const { dados: primeira, headers } = await httpJson(url(1));
-  const paginas = Math.min(Math.ceil(Number(headers.get('x-total-count') ?? 0) / 100), 60);
-  const itens = [...primeira.dados];
-  for (let p = 2; p <= paginas; p += 6) {
-    const lote = await Promise.all(Array.from({ length: Math.min(6, paginas - p + 1) }, (_, i) => httpJson(url(p + i))));
-    for (const { dados } of lote) itens.push(...dados.dados);
-  }
-  const porAno = {};
-  let total = 0;
-  for (const d of itens) {
-    const v = Number(d.valorLiquido) || 0;
-    total += v;
-    porAno[d.ano] = (porAno[d.ano] ?? 0) + v;
-  }
-  return { total, qtd: itens.length, porAno };
+/** Soma da cota parlamentar (CEAP) por ano dentro da legislatura, a partir do índice local. */
+function cotaCamara(db, depId, legislatura) {
+  const ini = anoInicio(legislatura);
+  const linhas = db.prepare('SELECT ano, total, qtd FROM cam_ceap WHERE dep_id = ? AND ano BETWEEN ? AND ? ORDER BY ano')
+    .all(depId, ini, ini + 4);
+  const porAno = Object.fromEntries(linhas.map((l) => [l.ano, l.total]));
+  return { total: linhas.reduce((s, l) => s + l.total, 0), qtd: linhas.reduce((s, l) => s + l.qtd, 0), porAno };
 }
 
 const VOTO_LEGIVEL = { Sim: 'Sim', Não: 'Não', Abstenção: 'Abstenção', Obstrução: 'Obstrução', 'Artigo 17': 'Art. 17 (presidente)' };
@@ -108,12 +96,9 @@ export const camara = {
     const totalProps = Number(headers.get('x-total-count') ?? props.dados.length);
     const s = det.dados.ultimoStatus ?? {};
 
-    // A soma das despesas pode levar dezenas de páginas: se demorar, mostra só esse item como indisponível.
-    const despesas = await Promise.race([
-      somarDespesas(dep.id, dep.leg_fim).catch(() => null),
-      new Promise((r) => setTimeout(() => r(null), 25_000)),
-    ]);
-    const anos = Object.entries(despesas?.porAno ?? {}).sort(([a], [b]) => a - b);
+    // Cota parlamentar: arquivos anuais oficiais da Câmara (índice local), na última legislatura.
+    const despesas = cotaCamara(db, dep.id, dep.leg_fim);
+    const anos = Object.entries(despesas.porAno).sort(([a], [b]) => a - b);
     const legislaturas = dep.leg_fim - dep.leg_ini + 1;
 
     const votacoes = votacoesCamara(db, dep);
@@ -136,12 +121,10 @@ export const camara = {
         { rotulo: 'Proposições de autoria', valor: totalProps.toLocaleString('pt-BR'), detalhe: 'inclui requerimentos e emendas' },
         {
           rotulo: `Cota parlamentar (legislatura ${PERIODO_LEGISLATURA(dep.leg_fim)})`,
-          valor: !despesas ? 'indisponível' : despesas.qtd ? brl(despesas.total) : 'sem dados',
-          detalhe: !despesas
-            ? 'A API da Câmara demorou a responder. Tente de novo mais tarde.'
-            : despesas.qtd
-              ? `${despesas.qtd.toLocaleString('pt-BR')} despesas · ${anos.map(([a, v]) => `${a}: ${brl(v)}`).join(' · ')}`
-              : 'A Câmara não publica despesas desse período pela API.',
+          valor: despesas.qtd ? brl(despesas.total) : 'sem dados',
+          detalhe: despesas.qtd
+            ? `${despesas.qtd.toLocaleString('pt-BR')} despesas · ${anos.map(([a, v]) => `${a}: ${brl(v)}`).join(' · ')}`
+            : 'Sem despesas de cota nos arquivos da Câmara para esse período (disponíveis desde 2009).',
         },
         ...votacoes.indicadores,
       ],

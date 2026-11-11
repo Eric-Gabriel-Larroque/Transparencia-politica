@@ -75,6 +75,8 @@ CREATE TABLE IF NOT EXISTS sen_ceaps (ano INTEGER, senador TEXT, tipo TEXT, tota
 -- Empresas das quais o político é sócio (Receita Federal, quadro de sócios), cruzadas por nome + 6 dígitos do CPF.
 CREATE TABLE IF NOT EXISTS empresa_socio (cpf TEXT, cnpj_basico TEXT, qualificacao TEXT, data_entrada TEXT);
 CREATE TABLE IF NOT EXISTS empresa (cnpj_basico TEXT PRIMARY KEY, razao_social TEXT, natureza TEXT, capital REAL, porte TEXT);
+-- Cota parlamentar da Câmara (CEAP), dos arquivos anuais oficiais, somada por deputado e ano.
+CREATE TABLE IF NOT EXISTS cam_ceap (dep_id INTEGER, ano INTEGER, total REAL, qtd INTEGER, PRIMARY KEY (dep_id, ano));
 CREATE TABLE IF NOT EXISTS meta (chave TEXT PRIMARY KEY, valor TEXT);
 `;
 

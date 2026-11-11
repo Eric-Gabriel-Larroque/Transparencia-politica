@@ -333,6 +333,31 @@ async function indexarVotacoesCamara(db) {
   db.exec('CREATE INDEX IF NOT EXISTS ix_voto_dep ON cam_voto (dep_id, id_votacao); CREATE INDEX IF NOT EXISTS ix_votacao_data ON cam_votacao (data);');
 }
 
+// ---------------------------------------------------------------- Cota parlamentar da Câmara (CEAP)
+
+// Arquivos anuais oficiais (https://www.camara.leg.br/cotas/Ano-AAAA.csv.zip). Usados no lugar da API de
+// despesas, que em nov/2026 passou a devolver valorLiquido com sinal invertido para alguns deputados.
+async function indexarCeapCamara(db) {
+  const anoAtual = new Date().getFullYear();
+  const ins = db.prepare(`INSERT INTO cam_ceap (dep_id, ano, total, qtd) VALUES (?, ?, ?, 1)
+    ON CONFLICT DO UPDATE SET total = total + excluded.total, qtd = qtd + 1`);
+  for (let ano = 2009; ano <= anoAtual; ano++) {
+    const destino = path.join(PASTA_BRUTOS, `camara_ceap_${ano}.zip`);
+    if (ano >= anoAtual - 1) fs.rmSync(destino, { force: true });
+    if (!(await baixar(`https://www.camara.leg.br/cotas/Ano-${ano}.csv.zip`, destino))) continue;
+    db.exec('BEGIN');
+    let n = 0;
+    for await (const l of linhasDoZip(destino, { arquivo: /\.csv$/i, utf8: true })) {
+      const id = Number(l.ideCadastro);
+      if (!id) continue; // lideranças e outros registros sem deputado
+      ins.run(id, Number(l.numAno) || ano, numeroBr(l.vlrLiquido));
+      n++;
+    }
+    db.exec('COMMIT');
+    log(`Câmara CEAP ${ano}: ${n.toLocaleString('pt-BR')} despesas`);
+  }
+}
+
 // ---------------------------------------------------------------- Cota parlamentar do Senado (CEAPS)
 
 async function indexarCeaps(db) {
@@ -505,6 +530,7 @@ async function main() {
   await indexarDeputados(db);
   await indexarVotacoesCamara(db);
   await indexarCeaps(db);
+  await indexarCeapCamara(db);
   montarPessoas(db);
   await indexarEmpresas(db);
 

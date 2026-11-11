@@ -59,6 +59,17 @@ async function buscar(q) {
 
 // ---------------------------------------------------------------- ficha
 
+/** Valores em reais de 1 milhão para cima viram "R$ 177,3 mi" no destaque, com o valor exato embaixo. */
+function valorIndicador(valor) {
+  const texto = String(valor ?? '');
+  const m = texto.match(/^(-?)R\$\s*([\d.]+),(\d{2})$/);
+  const n = m ? Number(`${m[1]}${m[2].replace(/\./g, '')}.${m[3]}`) : NaN;
+  if (!Number.isFinite(n) || Math.abs(n) < 1e6) return `<div class="valor">${esc(texto)}</div>`;
+  const [div, sufixo] = Math.abs(n) >= 1e9 ? [1e9, 'bi'] : [1e6, 'mi'];
+  const curto = `R$ ${(n / div).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} ${sufixo}`;
+  return `<div class="valor" title="${esc(texto)}">${esc(curto)}</div><div class="rotulo">${esc(texto)}</div>`;
+}
+
 function etiquetaCorrespondencia(c) {
   if (c === 'cpf') return '<span class="etiqueta cpf" title="Cruzamento exato pelo CPF">por CPF</span>';
   if (c === 'nome') return '<span class="etiqueta nome" title="Cruzamento pelo nome: pode haver homônimos">por nome</span>';
@@ -77,7 +88,7 @@ function blocoFonte(f) {
   }
 
   const indicadores = f.indicadores?.length ? `<div class="indicadores">${f.indicadores.map((i) => `
-    <div class="indicador"><div class="valor">${esc(i.valor)}</div><div class="rotulo">${esc(i.rotulo)}</div>
+    <div class="indicador">${valorIndicador(i.valor)}<div class="rotulo">${esc(i.rotulo)}</div>
     ${i.detalhe ? `<div class="rotulo">${esc(i.detalhe)}</div>` : ''}</div>`).join('')}</div>` : '';
 
   const item = (r) => `
@@ -146,9 +157,9 @@ function blocoFinanciamento(lista) {
       <summary><span class="bens-titulo">${c.ano} · ${esc(capitalizar(c.cargo))}${c.unidade ? ` (${esc(capitalizar(c.unidade))})` : ''}</span>
         <span class="bens-total">${brl(c.arrecadado)}</span></summary>
       <div class="indicadores">
-        <div class="indicador"><div class="valor">${brl(c.arrecadado)}</div><div class="rotulo">Arrecadado</div></div>
+        <div class="indicador">${valorIndicador(brl(c.arrecadado))}<div class="rotulo">Arrecadado</div></div>
         <div class="indicador"><div class="valor">${c.percentualPublico}%</div><div class="rotulo">Dinheiro público</div><div class="rotulo">${brl(c.publico)}</div></div>
-        <div class="indicador"><div class="valor">${brl(c.gasto)}</div><div class="rotulo">Gastos contratados</div></div>
+        <div class="indicador">${valorIndicador(brl(c.gasto))}<div class="rotulo">Gastos contratados</div></div>
       </div>
       ${tabela('De onde veio o dinheiro', c.fontes, [(x) => x.nome])}
       ${tabela('Por origem', c.origens, [(x) => x.origem, (x) => `${x.qtd} receita(s)`])}

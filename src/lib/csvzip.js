@@ -87,7 +87,7 @@ function contarAspas(s) {
  * Se existir um arquivo *_BRASIL.csv, lê só ele (ele já junta todas as UFs);
  * caso contrário lê todos os .csv.
  */
-export async function* linhasDoZip(caminho, { arquivo, colunas } = {}) {
+export async function* linhasDoZip(caminho, { arquivo, colunas, utf8 = false } = {}) {
   const zip = await abrirZip(caminho);
   try {
     const csvs = (await listarEntradas(zip)).filter((e) => (arquivo ? arquivo.test(e.fileName) : /\.csv$/i.test(e.fileName)));
@@ -96,7 +96,7 @@ export async function* linhasDoZip(caminho, { arquivo, colunas } = {}) {
 
     for (const entrada of alvo) {
       const stream = await abrirEntrada(zip, entrada);
-      stream.setEncoding('latin1');
+      stream.setEncoding(utf8 ? 'utf8' : 'latin1');
       const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
       let cabecalho = colunas ?? null; // arquivos sem cabeçalho (ex.: Receita) recebem os nomes das colunas
       const estado = { buffer: [] };
@@ -104,7 +104,7 @@ export async function* linhasDoZip(caminho, { arquivo, colunas } = {}) {
         // Campo com quebra de linha dentro de aspas: junta até fechar as aspas (com limite).
         for (const linha of juntarLinhas(estado, bruta)) {
           if (!linha) continue;
-          const campos = dividirLinha(linha);
+          const campos = dividirLinha(cabecalho ? linha : linha.replace(/^\uFEFF/, ''));
           if (!cabecalho) { cabecalho = campos; continue; }
       if (campos.length < cabecalho.length / 2) continue; // fragmento de linha malformada
           if (campos.length < cabecalho.length / 2) continue; // fragmento de linha malformada
