@@ -54,6 +54,30 @@ function abrangencia(sigla) {
   return null;
 }
 
+// Numeração única do CNJ (Res. 65/2008): NNNNNNN-DD.AAAA.J.TR.OOOO
+// J = ramo da Justiça; TR = tribunal; OOOO = unidade de origem.
+const ESTADOS_TR = ['', 'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE',
+  'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SE', 'SP', 'TO'];
+// Seções judiciárias do TRF1 pelos dois primeiros dígitos da origem (conferido com publicações reais: 33 BA, 34 DF, 35 GO, 36 MT, 37 MA, 40 PI, 41 RO).
+const SECOES_TRF1 = { 30: 'AC', 31: 'AP', 32: 'AM', 33: 'BA', 34: 'DF', 35: 'GO', 36: 'MT', 37: 'MA', 38: 'MG', 39: 'PA', 40: 'PI', 41: 'RO', 42: 'RR', 43: 'TO' };
+
+/** Estado(s) de origem pelo número do processo; 'superior' para ações originárias dos tribunais superiores; null se não der. */
+function origemPeloNumero(numero) {
+  const d = String(numero ?? '').replace(/\D/g, '');
+  if (d.length !== 20) return null;
+  const j = Number(d[13]);
+  const tr = Number(d.slice(14, 16));
+  const origem = d.slice(16, 20);
+  if ([1, 2, 3, 7].includes(j)) return 'superior'; // STF, CNJ, STJ, Justiça Militar da União
+  if ([6, 8, 9].includes(j)) return ESTADOS_TR[tr] ? [ESTADOS_TR[tr]] : null; // eleitoral, estadual, militar estadual
+  if (j === 5) return ufsDe(TRT, tr).length ? ufsDe(TRT, tr) : null; // trabalho
+  if (j === 4) {
+    if (tr === 1) { const uf = SECOES_TRF1[Number(origem.slice(0, 2))]; return uf ? [uf] : ufsDe(TRF, 1); }
+    return ufsDe(TRF, tr).length ? ufsDe(TRF, tr) : null;
+  }
+  return null;
+}
+
 /** Siglas dos tribunais onde vale procurar uma pessoa que concorreu nessas UFs. */
 function tribunaisRelevantes(ufs) {
   const siglas = new Set(SUPERIORES);
@@ -178,11 +202,12 @@ export const djen = {
       const data = dataBr(campo(it, 'data_disponibilizacao', 'dataDisponibilizacao', 'datadisponibilizacao'));
       const classe = semHtml(campo(it, 'nomeClasse', 'classe', 'nome_classe')).toUpperCase() || null;
       const tribunal = campo(it, 'siglaTribunal', 'tribunal');
-      const abr = abrangencia(tribunal);
+      // Estado de origem: primeiro pelo número do processo (mais preciso); senão, pela abrangência do tribunal.
+      const abr = origemPeloNumero(numero) ?? abrangencia(tribunal);
       const atual = processos.get(numero) ?? {
         numero, classe, natureza: natureza(classe), tribunal,
         relevante: abr === 'superior' || (Array.isArray(abr) && abr.some((u) => ufs.includes(u))),
-        superior: abr === 'superior',
+        origem: Array.isArray(abr) && abr.length === 1 ? abr[0] : null,
         orgao: semHtml(campo(it, 'nomeOrgao', 'orgao')) || null,
         polo: POLOS[campo(meu, 'polo')] ?? null,
         publicacoes: 0, ultima: null, link: null, trecho: null,
@@ -207,7 +232,8 @@ export const djen = {
     const rotuloNatureza = { criminal: 'Classe criminal', improbidade: 'Improbidade / ação civil pública', outros: null };
     const registro = (x) => ({
       titulo: `${x.classe ?? 'PROCESSO'} ${x.numero}`,
-      situacao: [rotuloNatureza[x.natureza], x.tribunal, x.orgao, x.polo].filter(Boolean).join(' · '),
+      situacao: [rotuloNatureza[x.natureza], x.origem ? `${x.tribunal} (origem: ${x.origem})` : x.tribunal, x.orgao, x.polo]
+        .filter(Boolean).join(' · '),
       detalhe: [
         `${x.publicacoes} publicação(ões); última em ${x.ultima ?? '?'}${x.tipo ? ` (${x.tipo})` : ''}`,
         x.trecho && `Trecho: "${x.trecho}${x.trecho.length >= 280 ? '…' : ''}"`,
