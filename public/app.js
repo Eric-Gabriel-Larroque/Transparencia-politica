@@ -160,14 +160,9 @@ function blocoFinanciamento(lista) {
 }
 
 function blocoApoio(apoio) {
-  if (!apoio) return '';
-  return `<aside class="apoio">
-    <p>A Ficha Pública é independente, gratuita e sem anúncios. Se ela foi útil, você pode ajudar a manter o servidor no ar.</p>
-    <div class="apoio-acoes">
-      ${apoio.url ? `<a class="apoio-botao" href="${esc(apoio.url)}" target="_blank" rel="noopener">☕ Pague um café</a>` : ''}
-      ${apoio.pix ? `<button type="button" class="apoio-botao secundario" data-pix="${esc(apoio.pix)}">Copiar chave Pix</button>` : ''}
-    </div>
-  </aside>`;
+  if (!apoio?.url) return '';
+  return `<p class="apoio">Achou útil? Você pode ajudar a manter o servidor no ar:
+    <a href="${esc(apoio.url)}" target="_blank" rel="noopener">☕ Buy me a coffee</a></p>`;
 }
 
 async function telaPerfil(id) {
@@ -225,11 +220,7 @@ async function telaPerfil(id) {
     <p class="meta" style="margin-top:16px">Consulta feita em ${new Date(d.consultadoEm).toLocaleString('pt-BR')}.
       Índice local do TSE/TCU atualizado em ${d.indiceAtualizadoEm ? new Date(d.indiceAtualizadoEm).toLocaleString('pt-BR') : '—'}.</p>
     ${blocoApoio(d.apoio)}`;
-  const pix = app.querySelector('[data-pix]');
-  pix?.addEventListener('click', async () => {
-    try { await navigator.clipboard.writeText(pix.dataset.pix); pix.textContent = 'Chave Pix copiada ✓'; }
-    catch { pix.textContent = `Chave Pix: ${pix.dataset.pix}`; }
-  });
+
 }
 
 // ---------------------------------------------------------------- rotas

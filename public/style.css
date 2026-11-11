@@ -146,9 +146,5 @@ a.etiqueta:hover { border-color: var(--destaque); }
 details.outros { margin-top: 14px; border-top: 1px dashed var(--borda); padding-top: 6px; }
 details.outros summary { color: var(--suave); }
 
-.apoio { margin-top: 28px; padding: 14px 16px; border: 1px dashed var(--borda); border-radius: var(--raio); color: var(--suave); font-size: .88rem; }
-.apoio p { margin: 0 0 10px; }
-.apoio-acoes { display: flex; gap: 8px; flex-wrap: wrap; }
-.apoio-botao { font: inherit; font-size: .85rem; font-weight: 600; padding: 7px 12px; border-radius: 99px; border: 1px solid var(--borda);
-  background: var(--superficie); color: var(--texto); text-decoration: none; cursor: pointer; }
-.apoio-botao:hover { border-color: var(--destaque); color: var(--destaque); }
+.apoio { margin-top: 24px; text-align: center; color: var(--suave); font-size: .88rem; }
+.apoio a { font-weight: 600; white-space: nowrap; }
