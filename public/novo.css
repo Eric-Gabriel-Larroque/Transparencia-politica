@@ -271,3 +271,12 @@ main.texto .rolagem table { min-width: 0; }
 .voto { font-weight: 800; font-size: .85rem; padding: 1px 10px; border-radius: 99px; background: var(--superficie); border: 1px solid var(--borda); }
 .voto.bom { background: var(--bom-fundo); color: var(--bom); border-color: transparent; }
 .voto.critico { background: var(--critico-fundo); color: var(--critico); border-color: transparent; }
+
+/* Navegação por estado/cidade */
+.migalhas { font-size: .82rem; color: var(--texto-3); margin: 2px 0 10px; }
+.migalhas a { color: var(--texto-2); }
+.grade-links { list-style: none; padding: 0; margin: 8px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 14px; }
+.grade-links a { text-decoration: none; font-size: .92rem; }
+.grade-links a:hover { text-decoration: underline; }
+article[data-ssr] ul { padding-left: 18px; }
+article[data-ssr] li { margin: 4px 0; }

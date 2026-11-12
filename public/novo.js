@@ -392,7 +392,10 @@ function selecionarAba(nome, rolar = false) {
 }
 
 async function telaFicha(id) {
-  app.innerHTML = `<div class="cartao"><div class="esqueleto" style="height:96px"></div></div>
+  // Se o servidor já mandou o resumo, mantém na tela enquanto as fontes ao vivo carregam.
+  if (app.querySelector('[data-ssr]')) {
+    app.insertAdjacentHTML('beforeend', '<p class="carregando">Consultando TSE, TCU, CNJ, CGU, Receita e Diário de Justiça…</p>');
+  } else app.innerHTML = `<div class="cartao"><div class="esqueleto" style="height:96px"></div></div>
     <div class="destaques">${'<div class="kpi"><div class="esqueleto" style="height:58px"></div></div>'.repeat(4)}</div>
     <p class="carregando">Consultando TSE, TCU, CNJ, CGU, Receita e Diário de Justiça…</p>`;
   let d;
@@ -464,6 +467,12 @@ function ligarReporte(id) {
 
 // ---------------------------------------------------------------- busca (página inicial)
 
+// Lista de estados (vem do servidor na primeira carga; guardada para reaproveitar).
+const estadosHtml = (() => {
+  const el = document.querySelector('#app .grade-links');
+  return el ? el.closest('section').outerHTML : '';
+})();
+
 function telaInicio(q = '') {
   document.title = 'Ficha Pública · ficha de integridade de qualquer político';
   app.innerHTML = `<section class="hero">
@@ -477,7 +486,7 @@ function telaInicio(q = '') {
       <div class="pilar"><h3>💰 Dinheiro</h3><p>Evolução do patrimônio declarado e quem financiou cada campanha, com o peso do dinheiro público.</p></div>
       <div class="pilar"><h3>🏢 Empresas</h3><p>De quais empresas é sócio e se elas têm contratos, pagamentos ou punições do governo federal.</p></div>
       <div class="pilar"><h3>🗳️ Todos os candidatos</h3><p>De vereador a presidente: mais de 880 mil pessoas, com fonte oficial em cada informação.</p></div>
-    </div>`;
+    </div>${estadosHtml}`;
   app.querySelector('[data-busca]').addEventListener('submit', (e) => {
     e.preventDefault(); const v = e.target.q.value.trim();
     history.pushState(null, '', `/?q=${encodeURIComponent(v)}`); buscar(v);
@@ -501,6 +510,7 @@ async function buscar(q) {
 function rotear() {
   // Links antigos com # (ex.: /#/p/2022-123) continuam funcionando.
   if (location.hash.startsWith('#/')) history.replaceState(null, '', location.hash.slice(1));
+  if (/^\/uf\//.test(location.pathname)) return; // páginas de estado/cidade vêm prontas do servidor
   const m = location.pathname.match(/^\/p\/(\d{4}-\d+)/);
   if (m) return telaFicha(m[1]);
   telaInicio(new URLSearchParams(location.search).get('q') ?? '');

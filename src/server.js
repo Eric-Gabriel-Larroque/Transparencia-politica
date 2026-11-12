@@ -20,6 +20,7 @@ import { djen } from './fontes/djen.js';
 import { carregarFinanciamento } from './fontes/financiamento.js';
 import { empresas } from './fontes/empresas.js';
 import { diarios } from './fontes/diarios.js';
+import { criarPaginas } from './paginas.js';
 
 // Prefere IPv4 nas conexões de saída. O IPv6 da Hostinger é registrado na Europa e serviços
 // brasileiros com bloqueio por país (ex.: DJEN do CNJ) recusam esse endereço; o IPv4 é do Brasil.
@@ -37,6 +38,7 @@ const TIMEOUT_FONTE = 45_000;
 const POR_SITEMAP = 50_000;
 
 const db = abrirBanco();
+const paginas = criarPaginas(db, (process.env.SITE_URL || 'https://transparencia-politica.tech').replace(/\/$/, ''));
 const cacheParcial = new Map();
 const emAndamento = new Map(); // id -> Promise: várias pessoas abrindo a mesma ficha geram uma consulta só
 
@@ -211,7 +213,7 @@ function modeloHtml() {
   return modelo;
 }
 
-function metaTags({ titulo, descricao, url, indexar = true }) {
+function metaTags({ titulo, descricao, url, indexar = true, extra = '' }) {
   return `<title>${esc(titulo)}</title>
   <meta name="description" content="${esc(descricao)}">
   <link rel="canonical" href="${esc(url)}">
@@ -225,38 +227,30 @@ function metaTags({ titulo, descricao, url, indexar = true }) {
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:locale" content="pt_BR">
-  <meta name="twitter:card" content="summary_large_image">`;
+  <meta name="twitter:card" content="summary_large_image">
+  ${extra}`;
 }
 
 function paginaInicial() {
+  const dadosSite = {
+    '@context': 'https://schema.org', '@type': 'WebSite', name: 'Ficha Pública', alternateName: 'Transparência Política',
+    url: `${SITE}/`, potentialAction: { '@type': 'SearchAction', target: `${SITE}/?q={busca}`, 'query-input': 'required name=busca' },
+  };
   return modeloHtml()
     .replace('<!--META-->', metaTags({
-      titulo: 'Ficha Pública · dados oficiais sobre políticos',
-      descricao: 'Consulte candidaturas, bens, financiamento de campanha, votações, empresas e registros no TCU, CNJ e Diário de Justiça de qualquer político brasileiro. Só dados oficiais, com link para a fonte.',
+      titulo: 'Ficha Pública · transparência política: processos, patrimônio e doadores de qualquer político',
+      descricao: 'Consulte processos, contas no TCU, condenações por improbidade, empresas, doadores de campanha, patrimônio e votações de qualquer político brasileiro, de vereador a presidente. Só dados oficiais, com link para a fonte, sem anúncios.',
       url: `${SITE}/`,
+      extra: `<script type="application/ld+json">${JSON.stringify(dadosSite)}</script>`,
     }))
-    .replace('<!--CONTEUDO-->', '');
+    .replace('<!--CONTEUDO-->', paginas.inicio());
 }
 
-function paginaPolitico(id) {
-  const [ano, sq] = id.split('-');
-  const ref = db.prepare('SELECT pessoa FROM candidaturas WHERE ano = ? AND sq = ?').get(Number(ano), sq);
-  const pessoa = ref && db.prepare('SELECT * FROM pessoas WHERE pessoa = ?').get(ref.pessoa);
-  if (!pessoa) return null;
-  const r = resumirPessoa(pessoa);
-  const nome = capitalizar(r.nome);
-  const cargos = r.cargos.map(capitalizar).join(', ');
-  const titulo = `${nome}${r.urnas[0] && normalizar(r.urnas[0]) !== normalizar(r.nome) ? ` (${capitalizar(r.urnas[0])})` : ''} · Ficha Pública`;
-  const descricao = `${cargos} · ${r.ufs.join(', ')} · ${r.partidos.join(', ')}. ${r.candidaturas} candidatura(s) de ${r.anos[0]} a ${r.anos[1]}`
-    + `${r.eleito ? `, eleito(a) ${r.eleito} vez(es)` : ''}. Bens, financiamento, votações, empresas e registros em órgãos de controle, com fonte oficial.`;
-  // Conteúdo básico já no HTML: buscadores e quem está sem JavaScript veem o essencial.
-  const conteudo = `<article class="cabecalho"><h1>${esc(nome)}</h1>
-    <p class="meta">${esc(cargos)} · ${esc(r.ufs.join(', '))} · ${esc(r.partidos.join(', '))}</p>
-    <p class="meta">${esc(descricao)}</p><p class="carregando">Consultando as fontes oficiais</p></article>`;
-  // A ficha "canônica" é a da candidatura mais recente (evita a mesma pessoa em vários endereços).
+function paginaGerada(p) {
+  if (!p) return null;
   return modeloHtml()
-    .replace('<!--META-->', metaTags({ titulo, descricao, url: `${SITE}/p/${pessoa.id}` }))
-    .replace('<!--CONTEUDO-->', conteudo);
+    .replace('<!--META-->', metaTags({ titulo: p.titulo, descricao: p.descricao, url: p.url, extra: p.extra }))
+    .replace('<!--CONTEUDO-->', p.conteudo);
 }
 
 function enviarHtml(res, status, html) {
@@ -269,7 +263,8 @@ function enviarHtml(res, status, html) {
 function sitemapIndice() {
   const total = db.prepare('SELECT COUNT(*) AS n FROM pessoas').get().n;
   const partes = Math.ceil(total / POR_SITEMAP);
-  const itens = Array.from({ length: partes }, (_, i) => `<sitemap><loc>${SITE}/sitemap-${i + 1}.xml</loc></sitemap>`).join('');
+  const itens = `<sitemap><loc>${SITE}/sitemap-locais.xml</loc></sitemap>`
+    + Array.from({ length: partes }, (_, i) => `<sitemap><loc>${SITE}/sitemap-${i + 1}.xml</loc></sitemap>`).join('');
   return `<?xml version="1.0" encoding="UTF-8"?><sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${itens}</sitemapindex>`;
 }
 
@@ -361,7 +356,7 @@ const servidor = http.createServer(async (req, res) => {
     if (caminho === '/' || caminho === '/index.html') return enviarHtml(res, 200, paginaInicial());
     const p = caminho.match(/^\/p\/(\d{4}-\d+)\/?$/);
     if (p) {
-      const html = paginaPolitico(p[1]);
+      const html = paginaGerada(paginas.ficha(p[1]));
       return html ? enviarHtml(res, 200, html) : enviarHtml(res, 404, paginaInicial().replace('<meta property="og:type"', '<meta name="robots" content="noindex"><meta property="og:type"'));
     }
     // Endereços do protótipo redirecionam para os definitivos
@@ -369,6 +364,21 @@ const servidor = http.createServer(async (req, res) => {
     if (antigo) {
       res.writeHead(301, { Location: (antigo[1] ?? '/') + url.search });
       return res.end();
+    }
+    const est = caminho.match(/^\/uf\/([A-Za-z]{2})\/?$/);
+    if (est) {
+      const html = paginaGerada(paginas.estado(est[1].toUpperCase()));
+      return html ? enviarHtml(res, 200, html) : enviarHtml(res, 404, paginaInicial());
+    }
+    const cid = caminho.match(/^\/uf\/([A-Za-z]{2})\/([a-z0-9-]+)\/?$/);
+    if (cid) {
+      const html = paginaGerada(paginas.cidade(cid[1].toUpperCase(), cid[2]));
+      return html ? enviarHtml(res, 200, html) : enviarHtml(res, 404, paginaInicial());
+    }
+    if (caminho === '/sitemap-locais.xml') {
+      res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8' });
+      return res.end(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${
+        paginas.urlsLocais().map((u) => `<url><loc>${u}</loc><priority>0.7</priority></url>`).join('')}</urlset>`);
     }
     if (caminho === '/sobre' || caminho === '/sobre/') return arquivoEstatico(res, 'sobre.html') || enviarHtml(res, 404, 'Não encontrado');
 

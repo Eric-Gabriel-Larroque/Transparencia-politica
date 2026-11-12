@@ -486,6 +486,7 @@ function montarPessoas(db) {
     UPDATE candidaturas SET pessoa = CASE WHEN cpf IS NOT NULL THEN cpf
       ELSE 'n:' || nome_norm || '|' || COALESCE(nascimento, uf, '') END;
     CREATE INDEX IF NOT EXISTS ix_cand_pessoa ON candidaturas (pessoa);
+    CREATE INDEX IF NOT EXISTS ix_cand_local ON candidaturas (uf, ano, cargo, unidade);
     CREATE INDEX IF NOT EXISTS ix_tcu_cpf ON tcu (cpf);
     CREATE INDEX IF NOT EXISTS ix_tcu_nome ON tcu (nome_norm);
     CREATE INDEX IF NOT EXISTS ix_cass ON cassacoes (ano, sq);
