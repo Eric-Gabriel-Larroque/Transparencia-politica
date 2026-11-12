@@ -237,22 +237,53 @@ function abaEmpresas(d) {
 }
 
 /** Agrupa votos pela proposição: ementa uma vez só e os votos resumidos numa linha. */
+// Tipo de cada votação, lido na descrição oficial (sem interpretar o mérito).
+function tipoVotacao(descricao) {
+  const d = String(descricao ?? '').toLowerCase();
+  if (/requerimento|preferência|adiamento|retirada de pauta|urgência|quebra de interstício|encerramento da discussão/.test(d)) {
+    return { rotulo: 'Procedimento', principal: false };
+  }
+  if (/destaque|emenda|subemenda|mantido o texto|mantida a|suprimid/.test(d) && !/aglutinativa substitutiva/.test(d)) {
+    return { rotulo: 'Destaque / emenda', principal: false };
+  }
+  if (/segundo turno|2º turno/.test(d)) return { rotulo: '2º turno (texto)', principal: true };
+  if (/primeiro turno|1º turno/.test(d)) return { rotulo: '1º turno (texto)', principal: true };
+  if (/aprovad[oa]|rejeitad[oa]|turno único|redação final|substitutivo|parecer/.test(d)) return { rotulo: 'Texto principal', principal: true };
+  return { rotulo: 'Outra votação', principal: false };
+}
+
+const COR_VOTO = { Sim: 'bom', 'Não': 'critico' };
+
 function listaVotos(l) {
   const grupos = new Map();
   for (const r of l.registros) {
     const [prop, voto] = String(r.titulo).split(' – votou ');
     if (!voto) continue;
+    const descricao = String(r.situacao ?? '').split(' · orientação')[0];
     const g = grupos.get(prop) ?? { prop, ementa: r.detalhe, link: r.link, votos: [], ultima: r.data };
-    g.votos.push(voto);
+    g.votos.push({ voto, data: r.data, descricao, ...tipoVotacao(descricao) });
     grupos.set(prop, g);
   }
-  const itens = [...grupos.values()].map((g) => `<li class="registro">
-      <div class="r-titulo">${g.link ? `<a href="${esc(g.link)}" target="_blank" rel="noopener">${esc(g.prop)} ↗</a>` : esc(g.prop)}
-        <span class="meta">· ${plural(g.votos.length, 'votação', 'votações')}${g.ultima ? `, última em ${esc(g.ultima)}` : ''}</span></div>
-      <div class="r-sit">Votou: <b>${g.votos.map(esc).join(' · ')}</b></div>
-      ${g.ementa ? `<div class="r-det">${esc(g.ementa)}</div>` : ''}</li>`);
+  const linhaVoto = (v) => `<li><span class="voto-tipo">${esc(v.data ?? '')} · ${esc(v.rotulo)}</span>
+      <span class="voto ${COR_VOTO[v.voto] ?? ''}">${esc(v.voto)}</span>
+      ${v.descricao ? `<div class="meta">${esc(v.descricao)}</div>` : ''}</li>`;
+  const itens = [...grupos.values()].map((g) => {
+    const principais = g.votos.filter((v) => v.principal);
+    const outros = g.votos.filter((v) => !v.principal);
+    return `<li class="registro">
+      <div class="r-titulo">${g.link ? `<a href="${esc(g.link)}" target="_blank" rel="noopener">${esc(g.prop)} ↗</a>` : esc(g.prop)}</div>
+      ${g.ementa ? `<div class="r-det">${esc(g.ementa)}</div>` : ''}
+      ${principais.length ? `<ul class="votos">${principais.map(linhaVoto).join('')}</ul>` : ''}
+      ${outros.length ? `<details class="explica"><summary>${principais.length ? `Mais ${plural(outros.length, 'votação', 'votações')} (destaques e procedimentos)` : `Ver ${plural(outros.length, 'votação', 'votações')}`}</summary>
+        <ul class="votos">${outros.map(linhaVoto).join('')}</ul></details>` : ''}
+    </li>`;
+  });
   if (!itens.length) return '';
   return `<h3 class="sub">${esc(l.titulo)}</h3>
+    <details class="explica"><summary>ⓘ Por que há vários votos na mesma proposta?</summary><p>Uma proposta passa por várias
+      votações no plenário: o texto principal (as PECs são votadas em dois turnos em cada Casa), os destaques (votações separadas de
+      trechos ou emendas) e requerimentos de procedimento, como urgência ou adiamento. Um "Não" num destaque pode significar votar
+      para manter o texto original, e não ser contra a proposta. Por isso mostramos o tipo de cada votação, como descrito pela própria Casa.</p></details>
     <ul class="registros">${itens.slice(0, 5).join('')}</ul>
     ${itens.length > 5 ? `<details class="explica"><summary>Ver mais ${itens.length - 5}</summary><ul class="registros">${itens.slice(5).join('')}</ul></details>` : ''}`;
 }
@@ -298,7 +329,8 @@ function cabecalho(d) {
       <h1>${esc(cap(urna))}</h1>
       <div class="civil">${esc(cap(p.nome))}${p.nascimento ? ` · nascido(a) em ${esc(p.nascimento)}` : ''}</div>
       <div class="chips">
-        <span class="chip marca">${esc(cap(ultima.cargo))} · ${esc(ultima.uf === 'BR' ? 'Brasil' : ultima.uf)} · ${esc(ultima.partido)}</span>
+        <span class="chip marca">${esc(cap(ultima.cargo))} · ${esc(ultima.uf === 'BR' ? 'Brasil' : ultima.uf)}</span>
+        <span class="chip">${esc(ultima.partido)}</span>
         ${eleito ? `<span class="chip bom">Eleito(a) em ${eleito.ano}</span>` : `<span class="chip">Não eleito(a) desde 2018</span>`}
       </div>
     </div>
