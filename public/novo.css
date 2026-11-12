@@ -201,6 +201,8 @@ table { width: 100%; border-collapse: collapse; font-size: .88rem; }
 th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--borda); vertical-align: top; }
 th { color: var(--texto-3); font-size: .74rem; text-transform: uppercase; letter-spacing: .04em; }
 td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rolagem table { min-width: 560px; }
+th { white-space: nowrap; }
 .rolagem { overflow-x: auto; }
 
 .carregando { color: var(--texto-3); padding: 40px 0; text-align: center; }
@@ -229,3 +231,14 @@ td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-n
 .rodape { border-top: 1px solid var(--borda); margin-top: 32px; }
 .rodape-in { max-width: 1040px; margin: 0 auto; padding: 20px 16px 40px; font-size: .82rem; color: var(--texto-3); }
 .apoio { text-align: center; font-size: .88rem; color: var(--texto-3); margin: 22px 0 0; }
+
+/* No celular, cada linha da tabela vira um cartão (sem rolagem lateral) */
+@media (max-width: 640px) {
+  table.cartoes-celular { min-width: 0; }
+  table.cartoes-celular thead { display: none; }
+  table.cartoes-celular tr { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; padding: 12px 0; border-bottom: 1px solid var(--borda); }
+  table.cartoes-celular td { border: 0; padding: 0; text-align: left; }
+  table.cartoes-celular td::before { content: attr(data-rotulo); display: block; font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; color: var(--texto-3); }
+  table.cartoes-celular td:first-child { grid-column: 1 / -1; font-size: 1.05rem; }
+  table.cartoes-celular td:first-child::before { display: none; }
+}

@@ -6,6 +6,8 @@ const app = document.getElementById('app');
 // ---------------------------------------------------------------- utilidades
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const RESULTADOS = { 'ELEITO POR QP': 'Eleito por quociente partidário', 'ELEITO POR MÉDIA': 'Eleito por média', '2º TURNO': 'Foi ao 2º turno' };
+const resultado = (r) => RESULTADOS[String(r ?? '').toUpperCase()] ?? null;
 const cap = (s) => String(s ?? '').toLowerCase().replace(/(^|[\s(/-])\S/g, (l) => l.toUpperCase());
 const brl = (v) => (v == null ? '—' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
 const brlInteiro = (v) => (v == null ? '—' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }));
@@ -272,11 +274,11 @@ function abaCandidaturas(d) {
   return `<section class="cartao">
     <div class="titulo-secao"><h2>Candidaturas</h2></div>
     <p class="origem">TSE – candidaturas desde 2018</p>
-    <div class="rolagem"><table>
+    <div class="rolagem"><table class="cartoes-celular">
       <thead><tr><th>Ano</th><th>Cargo</th><th>Local</th><th>Partido</th><th>Resultado</th><th class="num">Bens</th></tr></thead>
-      <tbody>${d.candidaturas.map((c) => `<tr><td>${c.ano}</td><td>${esc(cap(c.cargo))}</td>
-        <td>${esc(cap(c.unidade))}${c.uf && c.uf !== c.unidade && c.uf !== 'BR' ? `/${esc(c.uf)}` : ''}</td><td>${esc(c.partido)}</td>
-        <td>${esc(cap(c.resultado ?? c.situacao ?? '—'))}</td><td class="num">${compacto(c.bens)}</td></tr>`).join('')}</tbody>
+      <tbody>${d.candidaturas.map((c) => `<tr><td data-rotulo="Ano"><b>${c.ano}</b></td><td data-rotulo="Cargo">${esc(cap(c.cargo))}</td>
+        <td data-rotulo="Local">${esc(cap(c.unidade))}${c.uf && c.uf !== c.unidade && c.uf !== 'BR' ? `/${esc(c.uf)}` : ''}</td><td data-rotulo="Partido">${esc(c.partido)}</td>
+        <td data-rotulo="Resultado">${esc(resultado(c.resultado) ?? cap(c.resultado ?? c.situacao ?? '—'))}</td><td class="num" data-rotulo="Bens">${compacto(c.bens)}</td></tr>`).join('')}</tbody>
     </table></div>
   </section>`;
 }

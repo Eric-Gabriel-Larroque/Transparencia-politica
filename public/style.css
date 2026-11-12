@@ -153,7 +153,12 @@ details.outros summary { color: var(--suave); }
 .indicador { min-width: 0; }
 .indicador .valor { font-size: clamp(.95rem, 4.2vw, 1.2rem); line-height: 1.25; overflow-wrap: anywhere; }
 .indicador .rotulo { overflow-wrap: anywhere; }
-.cartao, .registro, .lista-bens li > div:first-child { min-width: 0; overflow-wrap: anywhere; }
+.cartao { min-width: 0; }
+.registro, .lista-bens li > div:first-child { min-width: 0; overflow-wrap: anywhere; }
+/* Tabelas: quebram só entre palavras; se não couber, rolam para o lado */
+table th, table td { overflow-wrap: normal; word-break: normal; }
+.tabela-rolagem table { min-width: 600px; }
+th { white-space: nowrap; }
 .bens-ano summary { flex-wrap: wrap; }
 @media (max-width: 380px) {
   .indicadores { grid-template-columns: 1fr 1fr; gap: 8px; }

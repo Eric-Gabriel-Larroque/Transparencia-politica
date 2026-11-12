@@ -4,6 +4,8 @@ const app = document.getElementById('app');
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const brl = (v) => (v == null ? '—' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
+const RESULTADOS = { 'ELEITO POR QP': 'Eleito por quociente partidário', 'ELEITO POR MÉDIA': 'Eleito por média', '2º TURNO': 'Foi ao 2º turno' };
+const resultado = (r) => RESULTADOS[String(r ?? '').toUpperCase()] ?? null;
 const capitalizar = (s) => String(s ?? '').toLowerCase().replace(/(^|\s)\S/g, (l) => l.toUpperCase());
 
 async function api(caminho) {
@@ -229,7 +231,7 @@ async function telaPerfil(id) {
         <thead><tr><th>Ano</th><th>Cargo</th><th>Local</th><th>Partido</th><th>Resultado</th><th>Registro</th><th class="num">Bens declarados</th></tr></thead>
         <tbody>${d.candidaturas.map((c) => `<tr>
           <td>${c.ano}</td><td>${esc(capitalizar(c.cargo))}</td><td>${esc(capitalizar(c.unidade))}${c.uf && c.uf !== c.unidade ? `/${esc(c.uf)}` : ''}</td>
-          <td>${esc(c.partido)}</td><td>${esc(capitalizar(c.resultado ?? '—'))}</td><td>${esc(capitalizar(c.situacao ?? '—'))}</td>
+          <td>${esc(c.partido)}</td><td>${esc(resultado(c.resultado) ?? capitalizar(c.resultado ?? '—'))}</td><td>${esc(capitalizar(c.situacao ?? '—'))}</td>
           <td class="num">${brl(c.bens)}</td></tr>`).join('')}</tbody>
       </table></div>
     </section>
