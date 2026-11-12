@@ -280,3 +280,8 @@ main.texto .rolagem table { min-width: 0; }
 .grade-links a:hover { text-decoration: underline; }
 article[data-ssr] ul { padding-left: 18px; }
 article[data-ssr] li { margin: 4px 0; }
+
+/* iPhone dá zoom ao tocar em campos com letra menor que 16px: todos os campos usam 16px */
+input, select, textarea { font-size: 16px !important; }
+/* Espaço entre o conteúdo da aba e o cartão de reporte (e demais cartões soltos) */
+.painel + .painel + .reporte, .reporte { margin-top: 14px; }
