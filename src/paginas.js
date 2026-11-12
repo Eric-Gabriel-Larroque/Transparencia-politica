@@ -20,7 +20,9 @@ const RESULTADOS = { 'ELEITO POR QP': 'Eleito por quociente partidário', 'ELEIT
 const resultado = (r) => RESULTADOS[String(r ?? '').toUpperCase()] ?? cap(r);
 
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-export const cap = (s) => String(s ?? '').toLowerCase().replace(/(^|[\s(/-])\S/g, (l) => l.toUpperCase());
+export const cap = (s) => String(s ?? '').toLowerCase().replace(/(^|[\s(/-])\S/g, (l) => l.toUpperCase())
+  // preposições ficam minúsculas no meio do nome: "Barra do Corda", "Mato Grosso do Sul"
+  .replace(/(?<=\S\s)(De|Da|Do|Das|Dos|E)(?=\s)/g, (w) => w.toLowerCase());
 export const slug = (s) => normalizar(s).toLowerCase().replace(/\s+/g, '-');
 const brl = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 function compacto(v) {

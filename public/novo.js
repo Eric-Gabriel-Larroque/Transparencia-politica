@@ -8,7 +8,9 @@ const app = document.getElementById('app');
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const RESULTADOS = { 'ELEITO POR QP': 'Eleito por quociente partidário', 'ELEITO POR MÉDIA': 'Eleito por média', '2º TURNO': 'Foi ao 2º turno' };
 const resultado = (r) => RESULTADOS[String(r ?? '').toUpperCase()] ?? null;
-const cap = (s) => String(s ?? '').toLowerCase().replace(/(^|[\s(/-])\S/g, (l) => l.toUpperCase());
+const cap = (s) => String(s ?? '').toLowerCase().replace(/(^|[\s(/-])\S/g, (l) => l.toUpperCase())
+  // preposições ficam minúsculas no meio do nome: "Barra do Corda", "Mato Grosso do Sul"
+  .replace(/(?<=\S\s)(De|Da|Do|Das|Dos|E)(?=\s)/g, (w) => w.toLowerCase());
 const brl = (v) => (v == null ? '—' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
 const brlInteiro = (v) => (v == null ? '—' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }));
 function compacto(v) {
