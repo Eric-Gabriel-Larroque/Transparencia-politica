@@ -35,6 +35,8 @@ const PUBLICO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../p
 const VALIDADE_CACHE = 24 * 60 * 60 * 1000; // ficha completa guardada por 24h (banco, sobrevive a reinícios)
 const VALIDADE_CACHE_PARCIAL = 10 * 60 * 1000; // ficha com alguma fonte fora do ar: 10 min, só em memória
 const TIMEOUT_FONTE = 45_000;
+// Aumente quando o formato da ficha mudar: fichas guardadas no formato antigo deixam de ser usadas.
+const FORMATO_FICHA = 2;
 const POR_SITEMAP = 50_000;
 
 const db = abrirBanco();
@@ -156,7 +158,7 @@ async function montarFicha(id) {
 function fichaEmCache(id) {
   const parcial = cacheParcial.get(id);
   if (parcial && Date.now() - parcial.em < VALIDADE_CACHE_PARCIAL) return parcial.dados;
-  return lerFicha(id, VALIDADE_CACHE);
+  return lerFicha(`${id}|${FORMATO_FICHA}`, VALIDADE_CACHE);
 }
 
 async function perfil(id) {
@@ -168,7 +170,7 @@ async function perfil(id) {
     if (dados) {
       // Ficha completa vai para o banco (24h). Com alguma fonte fora do ar, guarda só 10 min em memória.
       if (dados.fontes.some((f) => f.status === 'erro')) cacheParcial.set(id, { em: Date.now(), dados });
-      else gravarFicha(id, dados);
+      else gravarFicha(`${id}|${FORMATO_FICHA}`, dados);
     }
     return dados;
   }).finally(() => emAndamento.delete(id));

@@ -88,6 +88,17 @@ export const cgu = {
       link: 'https://portaldatransparencia.gov.br/',
       alerta: registros.length > 0,
       registros,
+      // Cargos públicos (cadastro de pessoas expostas politicamente), do mais recente ao mais antigo.
+      cargosPublicos: peps.map((x) => ({
+        funcao: String(x.descricao_funcao ?? '').trim(),
+        orgao: String(x.nome_orgao ?? '').trim(),
+        inicio: x.dt_inicio_exercicio || null,
+        fim: x.dt_fim_exercicio || null,
+      })).sort((a, b) => String(b.inicio).localeCompare(String(a.inicio))),
+      emendas: emendas.length ? {
+        quantidade: emendas.length, truncado, empenhado, pago, destinos,
+        anos: anos.length ? [Math.min(...anos), Math.max(...anos)] : null,
+      } : null,
       indicadores: [
         { rotulo: 'Emendas parlamentares', valor: `${truncado ? 'mais de ' : ''}${emendas.length.toLocaleString('pt-BR')}`,
           detalhe: `busca pelo nome parlamentar${anos.length ? ` · ${Math.min(...anos)}–${Math.max(...anos)}` : ''}` },

@@ -290,10 +290,45 @@ function listaVotos(l) {
     ${itens.length > 5 ? `<details class="explica"><summary>Ver mais ${itens.length - 5}</summary><ul class="registros">${itens.slice(5).join('')}</ul></details>` : ''}`;
 }
 
+const dataBr = (iso) => (iso ? String(iso).slice(0, 10).split('-').reverse().join('/') : null);
+
+function blocoCargosPublicos(d) {
+  const cgu = d.fontes.find((f) => f.id === 'cgu');
+  if (!cgu || cgu.status !== 'ok') return '';
+  const cargos = cgu.cargosPublicos ?? [];
+  const em = cgu.emendas;
+  if (!cargos.length && !em) return '';
+  return `<section class="cartao">
+    <div class="titulo-secao"><h2>Cargos públicos e emendas</h2></div>
+    <p class="origem">CGU – Portal da Transparência · <a href="https://portaldatransparencia.gov.br/" target="_blank" rel="noopener">fonte oficial ↗</a></p>
+    ${cargos.length ? `<h3 class="sub">Cargos públicos</h3>
+      <ul class="lista-valores">${cargos.map((c) => `<li><div>${esc(c.funcao)}<div class="meta">${esc(cap(c.orgao))}</div></div>
+        <span class="meta">${esc(dataBr(c.inicio) ?? '?')} – ${esc(dataBr(c.fim) ?? 'atual')}</span></li>`).join('')}</ul>
+      <details class="explica"><summary>ⓘ O que isso significa?</summary><p>Lista oficial de "pessoas expostas politicamente": quem ocupa
+        ou ocupou, nos últimos 5 anos, cargos como ministro, parlamentar, governador, prefeito ou alto cargo do governo. Estar nesta lista
+        não indica nenhuma irregularidade.</p></details>` : ''}
+    ${em ? `<h3 class="sub">Emendas parlamentares</h3>
+      <div class="numeros">
+        <div class="numero"><b>${esc(compacto(em.empenhado))}</b><span>empenhado em ${em.truncado ? 'mais de ' : ''}${em.quantidade} emendas${em.anos ? ` (${em.anos[0]}–${em.anos[1]})` : ''}</span></div>
+        <div class="numero"><b>${esc(compacto(em.pago))}</b><span>efetivamente pago</span></div>
+      </div>
+      ${em.destinos ? `<p class="meta">Maiores destinos: ${esc(em.destinos)}</p>` : ''}
+      <details class="explica"><summary>ⓘ O que isso significa?</summary><p>Emendas parlamentares são a parte do orçamento federal que
+        deputados e senadores indicam para obras e serviços. "Empenhado" é o valor reservado; "pago" é o que de fato saiu. A busca é pelo
+        nome parlamentar.</p></details>` : ''}
+  </section>`;
+}
+
 function abaAtuacao(d) {
   const casas = d.fontes.filter((f) => ['camara', 'senado'].includes(f.id) && f.status === 'ok');
-  if (!casas.length) return '<section class="cartao"><p class="meta">Sem mandato na Câmara dos Deputados ou no Senado desde 1983.</p></section>';
-  return casas.map((f) => `<section class="cartao">
+  const cargos = blocoCargosPublicos(d);
+  if (!casas.length) {
+    return `${cargos}<section class="cartao">
+      <div class="titulo-secao"><h2>Atuação no Congresso</h2></div>
+      <p class="meta">Sem mandato na Câmara dos Deputados ou no Senado desde 1983, por isso não há votações nem proposições federais.
+        Dados de gestão de governadores e prefeitos (orçamento, obras, decretos) ainda não fazem parte da ficha.</p></section>`;
+  }
+  return cargos + casas.map((f) => `<section class="cartao">
     <div class="titulo-secao"><h2>${esc(f.id === 'camara' ? 'Câmara dos Deputados' : 'Senado Federal')}</h2>
       <a class="botao" href="${esc(f.link)}" target="_blank" rel="noopener">Página oficial ↗</a></div>
     <p class="origem">${esc(f.orgao)} · ${esc(CORRESPONDENCIA[f.correspondencia] ?? '')}</p>
@@ -407,10 +442,9 @@ async function telaFicha(id) {
   document.title = `${cap(d.pessoa.urnas[0] ?? d.pessoa.nome)} · Ficha Pública`;
   const integ = ['tcu', 'cnj', 'cgu', 'tse'].map((x) => statusIntegridade(d.fontes.find((f) => f.id === x))).filter(Boolean);
   const nAlertas = integ.reduce((s, x) => s + x.confirmados, 0);
-  const temAtuacao = d.fontes.some((f) => ['camara', 'senado'].includes(f.id) && f.status === 'ok');
 
   app.innerHTML = `${cabecalho(d)}${destaques(d)}
-    <nav class="abas" role="tablist">${ABAS.filter(([id]) => id !== 'atuacao' || temAtuacao).map(([idAba, rotulo]) => `
+    <nav class="abas" role="tablist">${ABAS.map(([idAba, rotulo]) => `
       <button class="aba" role="tab" data-aba="${idAba}">${rotulo}${idAba === 'integridade' && nAlertas ? ` <span class="contagem critico">${nAlertas}</span>` : ''}</button>`).join('')}</nav>
     ${ABAS.map(([idAba, , render]) => `<div class="painel" role="tabpanel" data-painel="${idAba}">${render(d)}</div>`).join('')}
     ${blocoReporte(d)}
