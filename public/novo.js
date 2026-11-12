@@ -1,4 +1,4 @@
-// Ficha Pública – protótipo do novo layout (/novo e /novo/p/<id>).
+// Ficha Pública – interface (página inicial "/" e ficha "/p/<id>").
 // Usa a mesma API do site atual; só a apresentação muda.
 
 const app = document.getElementById('app');
@@ -292,8 +292,8 @@ function cabecalho(d) {
   const foto = p.foto ?? d.fontes.find((f) => f.foto)?.foto;
   const urna = p.urnas[0] ?? p.nome;
   return `<section class="cartao perfil">
-    ${foto ? `<img class="avatar" src="${esc(foto)}" alt="Foto oficial de ${esc(cap(urna))}" referrerpolicy="no-referrer" onerror="this.outerHTML='<div class=&quot;avatar&quot;>${esc(iniciais(p.nome))}</div>'">`
-      : `<div class="avatar" aria-hidden="true">${esc(iniciais(p.nome))}</div>`}
+    <div class="avatar" aria-hidden="${foto ? 'false' : 'true'}"><span>${esc(iniciais(p.nome))}</span>${foto
+      ? `<img src="${esc(foto)}" alt="Foto oficial de ${esc(cap(urna))}" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}</div>
     <div>
       <h1>${esc(cap(urna))}</h1>
       <div class="civil">${esc(cap(p.nome))}${p.nascimento ? ` · nascido(a) em ${esc(p.nascimento)}` : ''}</div>
@@ -306,7 +306,7 @@ function cabecalho(d) {
       <span class="conferido">Dados conferidos em ${new Date(d.consultadoEm).toLocaleDateString('pt-BR')}</span>
       <div class="chips">
         <button type="button" class="botao" data-compartilhar>Compartilhar</button>
-        <a class="botao" href="/p/${esc(p.id)}#reportar">Reportar erro</a>
+        <a class="botao" href="#reportar" data-ir-reporte>Reportar erro</a>
       </div>
     </div>
   </section>`;
@@ -365,7 +365,7 @@ async function telaFicha(id) {
     <p class="carregando">Consultando TSE, TCU, CNJ, CGU, Receita e Diário de Justiça…</p>`;
   let d;
   try { d = await api(`/api/politico/${encodeURIComponent(id)}`); } catch (e) {
-    app.innerHTML = `<section class="cartao"><p>${esc(e.message)}</p><a href="/novo">← Voltar</a></section>`; return;
+    app.innerHTML = `<section class="cartao"><p>${esc(e.message)}</p><a href="/">← Voltar</a></section>`; return;
   }
   document.title = `${cap(d.pessoa.urnas[0] ?? d.pessoa.nome)} · Ficha Pública`;
   const integ = ['tcu', 'cnj', 'cgu', 'tse'].map((x) => statusIntegridade(d.fontes.find((f) => f.id === x))).filter(Boolean);
@@ -376,7 +376,12 @@ async function telaFicha(id) {
     <nav class="abas" role="tablist">${ABAS.filter(([id]) => id !== 'atuacao' || temAtuacao).map(([idAba, rotulo]) => `
       <button class="aba" role="tab" data-aba="${idAba}">${rotulo}${idAba === 'integridade' && nAlertas ? ` <span class="contagem critico">${nAlertas}</span>` : ''}</button>`).join('')}</nav>
     ${ABAS.map(([idAba, , render]) => `<div class="painel" role="tabpanel" data-painel="${idAba}">${render(d)}</div>`).join('')}
+    ${blocoReporte(d)}
     <p class="apoio">Achou útil? Você pode ajudar a manter o servidor no ar: <a href="${esc(d.apoio?.url ?? '#')}" target="_blank" rel="noopener">☕ Buy me a coffee</a></p>`;
+  ligarReporte(d.pessoa.id);
+  app.querySelector('[data-ir-reporte]')?.addEventListener('click', (e) => {
+    e.preventDefault(); document.getElementById('reportar')?.scrollIntoView({ behavior: 'smooth' });
+  });
 
   app.querySelectorAll('.aba').forEach((b) => b.addEventListener('click', () => selecionarAba(b.dataset.aba)));
   app.querySelectorAll('[data-ir-aba]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); selecionarAba(a.dataset.irAba, true); }));
@@ -386,6 +391,42 @@ async function telaFicha(id) {
     const url = `${location.origin}/p/${d.pessoa.id}`;
     if (navigator.share) { try { await navigator.share({ title: document.title, url }); } catch { /* cancelado */ } return; }
     try { await navigator.clipboard.writeText(url); e.target.textContent = 'Link copiado ✓'; } catch { e.target.textContent = url; }
+  });
+}
+
+// ---------------------------------------------------------------- reportar erro
+
+function blocoReporte(d) {
+  const secoes = ['Justiça e controle', 'Dinheiro', 'Empresas', 'Atuação', 'Candidaturas', 'Outro'];
+  return `<section class="cartao reporte" id="reportar">
+    <div class="titulo-secao"><h2>Encontrou um erro?</h2></div>
+    <p class="origem">Dado errado, homônimo misturado ou informação desatualizada: conte o que viu. Se você é a pessoa desta ficha, também pode usar este canal.</p>
+    <form data-reporte>
+      <label>Em qual parte?<select name="secao">${secoes.map((x) => `<option>${esc(x)}</option>`).join('')}</select></label>
+      <label>O que está errado?<textarea name="mensagem" rows="4" required minlength="10" maxlength="3000"
+        placeholder="Ex.: o processo X é de outra pessoa com o mesmo nome"></textarea></label>
+      <label>Contato para retorno (opcional)<input name="contato" maxlength="200" placeholder="e-mail ou telefone"></label>
+      <button type="submit" class="botao primario">Enviar</button>
+      <p class="meta" data-status></p>
+    </form>
+  </section>`;
+}
+
+function ligarReporte(id) {
+  const form = app.querySelector('[data-reporte]');
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const status = form.querySelector('[data-status]');
+    const botao = form.querySelector('button');
+    botao.disabled = true; status.textContent = 'Enviando…';
+    try {
+      const res = await fetch('/api/reportar', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ficha: id, nome: document.querySelector('h1')?.textContent, secao: form.secao.value,
+          mensagem: form.mensagem.value, contato: form.contato.value }) });
+      const r = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(r.erro ?? 'Não foi possível enviar agora.');
+      form.innerHTML = '<p class="aviso">Obrigado! Seu reporte foi registrado e será analisado.</p>';
+    } catch (err) { status.textContent = err.message; botao.disabled = false; }
   });
 }
 
@@ -407,7 +448,7 @@ function telaInicio(q = '') {
     </div>`;
   app.querySelector('[data-busca]').addEventListener('submit', (e) => {
     e.preventDefault(); const v = e.target.q.value.trim();
-    history.pushState(null, '', `/novo?q=${encodeURIComponent(v)}`); buscar(v);
+    history.pushState(null, '', `/?q=${encodeURIComponent(v)}`); buscar(v);
   });
   if (q) buscar(q);
 }
@@ -417,7 +458,7 @@ async function buscar(q) {
   if (!alvo) return telaInicio(q);
   alvo.innerHTML = '<p class="carregando">Buscando…</p>';
   const { resultados } = await api(`/api/buscar?q=${encodeURIComponent(q)}`);
-  alvo.innerHTML = resultados.length ? `<ul class="resultados">${resultados.map((r) => `<li><a href="/novo/p/${esc(r.id)}">
+  alvo.innerHTML = resultados.length ? `<ul class="resultados">${resultados.map((r) => `<li><a href="/p/${esc(r.id)}">
       <span class="nome">${esc(cap(r.urnas[0] ?? r.nome))}</span>${r.eleito ? `<span class="chip bom">eleito(a) ${r.eleito}x</span>` : '<span></span>'}
       <span class="info">${esc(cap(r.nome))} · ${esc(r.cargos.map(cap).join(', '))} · ${esc(r.ufs.join(', '))} · ${esc(r.partidos.join(', '))} · ${r.anos[0]}–${r.anos[1]}</span></a></li>`).join('')}</ul>`
     : '<p class="carregando">Ninguém encontrado. Tente o nome completo ou o nome de urna.</p>';
@@ -426,13 +467,15 @@ async function buscar(q) {
 // ---------------------------------------------------------------- rotas
 
 function rotear() {
-  const m = location.pathname.match(/^\/novo\/p\/(\d{4}-\d+)/);
+  // Links antigos com # (ex.: /#/p/2022-123) continuam funcionando.
+  if (location.hash.startsWith('#/')) history.replaceState(null, '', location.hash.slice(1));
+  const m = location.pathname.match(/^\/p\/(\d{4}-\d+)/);
   if (m) return telaFicha(m[1]);
   telaInicio(new URLSearchParams(location.search).get('q') ?? '');
 }
 document.querySelector('[data-busca-topo]')?.addEventListener('submit', (e) => {
   e.preventDefault(); const v = e.target.q.value.trim(); if (!v) return;
-  history.pushState(null, '', `/novo?q=${encodeURIComponent(v)}`); telaInicio(v);
+  history.pushState(null, '', `/?q=${encodeURIComponent(v)}`); telaInicio(v);
 });
 window.addEventListener('popstate', rotear);
 rotear();

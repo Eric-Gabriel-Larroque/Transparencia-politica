@@ -200,9 +200,14 @@ setInterval(() => {
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const capitalizar = (s) => String(s ?? '').toLowerCase().replace(/(^|\s)\S/g, (l) => l.toUpperCase());
 let modelo = null;
+// Muda a cada reinício (ou seja, a cada atualização): obriga o navegador a baixar CSS/JS novos,
+// mesmo que o Cloudflare tenha mandado guardar os antigos por horas.
+const VERSAO = Date.now().toString(36);
 function modeloHtml() {
   // Relê a cada requisição em desenvolvimento; em produção o arquivo só muda com reinício.
-  if (!modelo || process.env.NODE_ENV !== 'production') modelo = fs.readFileSync(path.join(PUBLICO, 'index.html'), 'utf8');
+  if (!modelo || process.env.NODE_ENV !== 'production') {
+    modelo = fs.readFileSync(path.join(PUBLICO, 'novo.html'), 'utf8').replaceAll('__VERSAO__', VERSAO);
+  }
   return modelo;
 }
 
@@ -327,6 +332,7 @@ function arquivoEstatico(res, nome) {
     'Content-Type': TIPOS[ext] ?? 'application/octet-stream',
     // CSS/JS mudam a cada atualização: o navegador revalida; imagens podem ficar mais tempo.
     'Cache-Control': ext === '.png' ? 'public, max-age=86400' : 'public, max-age=0, must-revalidate',
+    'CDN-Cache-Control': 'max-age=300',
   });
   fs.createReadStream(arquivo).pipe(res);
   return true;
@@ -358,9 +364,11 @@ const servidor = http.createServer(async (req, res) => {
       const html = paginaPolitico(p[1]);
       return html ? enviarHtml(res, 200, html) : enviarHtml(res, 404, paginaInicial().replace('<meta property="og:type"', '<meta name="robots" content="noindex"><meta property="og:type"'));
     }
-    // Protótipo do novo layout (não substitui o atual até ser aprovado)
-    if (caminho === '/novo' || caminho === '/novo/' || /^\/novo\/p\/\d{4}-\d+\/?$/.test(caminho)) {
-      return arquivoEstatico(res, 'novo.html') || enviarHtml(res, 404, 'Não encontrado');
+    // Endereços do protótipo redirecionam para os definitivos
+    const antigo = caminho.match(/^\/novo(\/p\/\d{4}-\d+)?\/?$/);
+    if (antigo) {
+      res.writeHead(301, { Location: (antigo[1] ?? '/') + url.search });
+      return res.end();
     }
     if (caminho === '/sobre' || caminho === '/sobre/') return arquivoEstatico(res, 'sobre.html') || enviarHtml(res, 404, 'Não encontrado');
 
