@@ -302,7 +302,7 @@ function blocoCargosPublicos(d) {
     <div class="titulo-secao"><h2>Cargos públicos e emendas</h2></div>
     <p class="origem">CGU – Portal da Transparência · <a href="https://portaldatransparencia.gov.br/" target="_blank" rel="noopener">fonte oficial ↗</a></p>
     ${cargos.length ? `<h3 class="sub">Cargos públicos</h3>
-      <ul class="lista-valores">${cargos.map((c) => `<li><div>${esc(c.funcao)}<div class="meta">${esc(cap(c.orgao))}</div></div>
+      <ul class="lista-valores">${cargos.map((c) => `<li><div>${esc(cap(c.funcao))}<div class="meta">${esc(cap(c.orgao))}</div></div>
         <span class="meta">${esc(dataBr(c.inicio) ?? '?')} – ${esc(dataBr(c.fim) ?? 'atual')}</span></li>`).join('')}</ul>
       <details class="explica"><summary>ⓘ O que isso significa?</summary><p>Lista oficial de "pessoas expostas politicamente": quem ocupa
         ou ocupou, nos últimos 5 anos, cargos como ministro, parlamentar, governador, prefeito ou alto cargo do governo. Estar nesta lista
