@@ -105,6 +105,7 @@ export const camara = {
 
     return {
       correspondencia: 'nome_nascimento',
+      foto: s.urlFoto ?? `https://www.camara.leg.br/internet/deputado/bandep/${dep.id}.jpg`,
       link: `https://www.camara.leg.br/deputados/${dep.id}`,
       listasExtras: votacoes.listas,
       indicadores: [
@@ -202,6 +203,7 @@ export const senado = {
 
     return {
       correspondencia: 'nome_nascimento',
+      foto: sen.UrlFotoParlamentar ?? null,
       link: `https://www25.senado.leg.br/web/senadores/senador/-/perfil/${sen.CodigoParlamentar}`,
       listasExtras: [
         votacoes.some((v) => v.sigla === 'PEC') && { titulo: 'Votos em PECs (últimos 4 anos)', registros: votacoes.filter((v) => v.sigla === 'PEC').slice(0, 20).map(linhaVoto) },

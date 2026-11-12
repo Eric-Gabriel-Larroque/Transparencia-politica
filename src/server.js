@@ -118,6 +118,13 @@ async function consultarFontes(p) {
   }));
 }
 
+/** Foto oficial da Câmara (endereço fixo pelo id do deputado), sem depender da API responder. */
+function fotoOficial(p) {
+  if (!p.nascimento) return null;
+  const dep = db.prepare('SELECT id FROM camara_deputados WHERE nome_norm = ? AND nascimento = ?').get(p.nome_norm, p.nascimento);
+  return dep ? `https://www.camara.leg.br/internet/deputado/bandep/${dep.id}.jpg` : null;
+}
+
 async function montarFicha(id) {
   const p = carregarPessoa(id);
   if (!p) return null;
@@ -126,6 +133,7 @@ async function montarFicha(id) {
   return {
     pessoa: {
       id: p.id, nome: p.nome, urnas: p.urnas, cargos: p.cargos, cpf: mascararCpf(p.cpf), nascimento: p.nascimento,
+      foto: fotoOficial(p),
       identificacao: p.cpf ? 'CPF (divulgado pelo TSE)' : 'nome completo e data de nascimento',
     },
     candidaturas: p.candidaturas.map((c) => ({
@@ -349,6 +357,10 @@ const servidor = http.createServer(async (req, res) => {
     if (p) {
       const html = paginaPolitico(p[1]);
       return html ? enviarHtml(res, 200, html) : enviarHtml(res, 404, paginaInicial().replace('<meta property="og:type"', '<meta name="robots" content="noindex"><meta property="og:type"'));
+    }
+    // Protótipo do novo layout (não substitui o atual até ser aprovado)
+    if (caminho === '/novo' || caminho === '/novo/' || /^\/novo\/p\/\d{4}-\d+\/?$/.test(caminho)) {
+      return arquivoEstatico(res, 'novo.html') || enviarHtml(res, 404, 'Não encontrado');
     }
     if (caminho === '/sobre' || caminho === '/sobre/') return arquivoEstatico(res, 'sobre.html') || enviarHtml(res, 404, 'Não encontrado');
 
