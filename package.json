@@ -12,6 +12,7 @@
     "reportes": "node --no-warnings scripts/reportes.js"
   },
   "dependencies": {
+    "qrcode": "^1.5.4",
     "yauzl": "^3.2.0"
   }
 }

@@ -21,6 +21,7 @@ import { carregarFinanciamento } from './fontes/financiamento.js';
 import { empresas } from './fontes/empresas.js';
 import { diarios } from './fontes/diarios.js';
 import { criarPaginas } from './paginas.js';
+import { pixDoSite } from './lib/pix.js';
 
 // Prefere IPv4 nas conexões de saída. O IPv6 da Hostinger é registrado na Europa e serviços
 // brasileiros com bloqueio por país (ex.: DJEN do CNJ) recusam esse endereço; o IPv4 é do Brasil.
@@ -353,6 +354,10 @@ const servidor = http.createServer(async (req, res) => {
       return dados ? json(res, 200, dados) : json(res, 404, { erro: 'Político não encontrado' });
     }
     if (caminho === '/api/reportar' && req.method === 'POST') return receberReporte(req, res);
+    if (caminho === '/api/pix') {
+      const pix = await pixDoSite();
+      return pix ? json(res, 200, pix) : json(res, 404, { erro: 'Pix não configurado' });
+    }
 
     // Páginas
     if (caminho === '/' || caminho === '/index.html') return enviarHtml(res, 200, paginaInicial());

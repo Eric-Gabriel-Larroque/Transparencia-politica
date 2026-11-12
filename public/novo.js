@@ -448,7 +448,11 @@ async function telaFicha(id) {
       <button class="aba" role="tab" data-aba="${idAba}">${rotulo}${idAba === 'integridade' && nAlertas ? ` <span class="contagem critico">${nAlertas}</span>` : ''}</button>`).join('')}</nav>
     ${ABAS.map(([idAba, , render]) => `<div class="painel" role="tabpanel" data-painel="${idAba}">${render(d)}</div>`).join('')}
     ${blocoReporte(d)}
-    <p class="apoio">Achou útil? Você pode ajudar a manter o servidor no ar: <a href="${esc(d.apoio?.url ?? '#')}" target="_blank" rel="noopener">☕ Buy me a coffee</a></p>`;
+    <div class="apoio">Achou útil? Você pode ajudar a manter o servidor no ar:
+      <a href="${esc(d.apoio?.url ?? '#')}" target="_blank" rel="noopener">☕ Buy me a coffee</a><span data-pix-opcao hidden> ou
+      <button type="button" class="link-botao" data-pix>💠 Pix</button></span>
+      <div class="painel-pix" data-pix-painel hidden></div></div>`;
+  ligarPix();
   ligarReporte(d.pessoa.id);
   app.querySelector('[data-ir-reporte]')?.addEventListener('click', (e) => {
     e.preventDefault(); document.getElementById('reportar')?.scrollIntoView({ behavior: 'smooth' });
@@ -462,6 +466,30 @@ async function telaFicha(id) {
     const url = `${location.origin}/p/${d.pessoa.id}`;
     if (navigator.share) { try { await navigator.share({ title: document.title, url }); } catch { /* cancelado */ } return; }
     try { await navigator.clipboard.writeText(url); e.target.textContent = 'Link copiado ✓'; } catch { e.target.textContent = url; }
+  });
+}
+
+// ---------------------------------------------------------------- apoio via Pix
+
+let pixCache;
+async function ligarPix() {
+  const opcao = app.querySelector('[data-pix-opcao]');
+  if (!opcao) return;
+  if (pixCache === undefined) pixCache = await fetch('/api/pix').then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  if (!pixCache) return; // Pix não configurado no servidor: mostra só o Buy me a coffee
+  opcao.hidden = false;
+  const painel = app.querySelector('[data-pix-painel]');
+  app.querySelector('[data-pix]').addEventListener('click', () => {
+    if (!painel.hidden) { painel.hidden = true; return; }
+    painel.innerHTML = `<div class="pix-qr" aria-label="QR Code Pix">${pixCache.svg}</div>
+      <p>No celular, copie o código e cole no app do seu banco em <b>Pix → Pix Copia e Cola</b>. No computador, escaneie o QR Code.
+        Você escolhe o valor.</p>
+      <button type="button" class="botao primario" data-copiar-pix>Copiar código Pix</button>`;
+    painel.hidden = false;
+    painel.querySelector('[data-copiar-pix]').addEventListener('click', async (e) => {
+      try { await navigator.clipboard.writeText(pixCache.codigo); e.target.textContent = 'Código copiado ✓'; }
+      catch { e.target.replaceWith(Object.assign(document.createElement('textarea'), { value: pixCache.codigo, rows: 4, readOnly: true })); }
+    });
   });
 }
 

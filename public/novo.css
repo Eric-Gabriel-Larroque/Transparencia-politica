@@ -285,3 +285,12 @@ article[data-ssr] li { margin: 4px 0; }
 input, select, textarea { font-size: 16px !important; }
 /* Espaço entre o conteúdo da aba e o cartão de reporte (e demais cartões soltos) */
 .painel + .painel + .reporte, .reporte { margin-top: 14px; }
+
+/* Apoio via Pix */
+.link-botao { font: inherit; background: none; border: 0; padding: 0; color: var(--marca); font-weight: 600; cursor: pointer; text-decoration: underline; }
+.painel-pix { margin: 12px auto 0; max-width: 340px; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio);
+  padding: 16px; display: grid; gap: 10px; justify-items: center; text-align: center; color: var(--texto-2); }
+.painel-pix p { margin: 0; font-size: .85rem; }
+.pix-qr { width: 180px; background: #fff; border-radius: 10px; padding: 6px; }
+.pix-qr svg { display: block; width: 100%; height: auto; }
+.painel-pix textarea { width: 100%; font-size: 12px !important; }
