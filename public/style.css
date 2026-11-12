@@ -159,3 +159,26 @@ details.outros summary { color: var(--suave); }
   .indicadores { grid-template-columns: 1fr 1fr; gap: 8px; }
   .indicador { padding: 8px 10px; }
 }
+
+/* Cabeçalho da ficha: compartilhar e reportar */
+.link-sobre { margin-left: auto; }
+.acoes-ficha { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 4px; }
+.opcoes-compartilhar { display: contents; }
+.acao { font: inherit; font-size: .85rem; font-weight: 600; padding: 6px 12px; border-radius: 99px; border: 1px solid var(--borda);
+  background: var(--superficie); color: var(--texto); text-decoration: none; cursor: pointer; }
+.acao:hover { border-color: var(--destaque); color: var(--destaque); }
+
+/* Formulário de reporte */
+.reporte form { display: grid; gap: 12px; margin-top: 10px; }
+.reporte label { display: grid; gap: 4px; font-size: .9rem; font-weight: 600; }
+.reporte select, .reporte textarea, .reporte input { font: inherit; font-weight: 400; padding: 10px 12px; border-radius: 8px;
+  border: 1px solid var(--borda); background: var(--fundo); color: var(--texto); width: 100%; }
+.reporte .botao { justify-self: start; }
+.reporte .botao:disabled { opacity: .6; cursor: wait; }
+
+/* Página Sobre */
+main.texto { max-width: 760px; padding-top: 12px; padding-bottom: 48px; }
+main.texto h1 { font-size: clamp(1.6rem, 4vw, 2rem); margin: 24px 0 12px; }
+main.texto h2 { font-size: 1.15rem; margin: 32px 0 8px; }
+main.texto p, main.texto li { line-height: 1.65; }
+main.texto table td:first-child { font-weight: 600; width: 34%; }

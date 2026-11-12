@@ -3,12 +3,14 @@
 // Defina a variável de ambiente CHAVE_PORTAL_TRANSPARENCIA para ativar esta fonte.
 
 import { httpJson, numeroBr, normalizar } from '../lib/util.js';
+import { filaCgu } from '../lib/limitador.js';
 
 const BASE = 'https://api.portaldatransparencia.gov.br/api-de-dados';
 const chave = () => process.env.CHAVE_PORTAL_TRANSPARENCIA;
 
 async function get(caminho) {
-  const { dados } = await httpJson(`${BASE}/${caminho}`, { headers: { 'chave-api-dados': chave() } });
+  // Toda chamada passa pela fila com limite por minuto (a API da CGU recusa acima de ~90/min).
+  const { dados } = await filaCgu(() => httpJson(`${BASE}/${caminho}`, { headers: { 'chave-api-dados': chave() } }));
   return Array.isArray(dados) ? dados : [];
 }
 
@@ -32,7 +34,7 @@ export const cgu = {
     ]);
 
     // Emendas: a API filtra pelo nome do autor (nome parlamentar), 15 por página.
-    const MAX_PAGINAS = 40;
+    const MAX_PAGINAS = 12; // até 180 emendas por autor; acima disso mostra "mais de"
     // Só faz sentido para quem disputou mandato federal. A API busca por trecho do nome e é sensível
     // a acentos (guarda sem acento). Aceita o autor só se todas as palavras do nome dele na CGU
     // estiverem no nome civil completo ("EUNICIO OLIVEIRA" ⊂ "EUNICIO LOPES DE OLIVEIRA").

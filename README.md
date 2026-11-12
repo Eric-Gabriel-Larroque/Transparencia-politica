@@ -58,7 +58,14 @@ journalctl -u ficha-publica -f                  # log do site
 journalctl -u ficha-publica-atualizar -n 20     # últimas atualizações automáticas
 systemctl restart ficha-publica                 # reiniciar o site
 nano /opt/ficha-publica/.env                    # trocar a chave da CGU (depois reinicie)
+cd /opt/ficha-publica && sudo -u ficha npm run reportes            # reportes de erro pendentes
+cd /opt/ficha-publica && sudo -u ficha npm run reportes -- resolver 3   # marcar o reporte 3 como resolvido
 ```
+
+Capacidade: cada ficha completa fica guardada por 24h em `data/cache.db` (sobrevive a reinícios), várias pessoas
+abrindo a mesma ficha ao mesmo tempo geram uma consulta só, e as chamadas à CGU passam por uma fila de no máximo
+80 por minuto (`CGU_POR_MINUTO`). Endereços públicos: `/p/<id>` (com título e pré-visualização para redes sociais),
+`/sobre`, `/sitemap.xml`.
 
 ## Chave do Portal da Transparência (CGU)
 

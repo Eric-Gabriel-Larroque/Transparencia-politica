@@ -5,8 +5,10 @@
 // pelo TSE: a chance de duas pessoas com o mesmo nome terem esses mesmos 6 dígitos é desprezível.
 
 import { http } from '../lib/util.js';
+import { filaCgu } from '../lib/limitador.js';
 
 const CGU = 'https://api.portaldatransparencia.gov.br/api-de-dados';
+const LIMITE_EMPRESAS = 10;
 const chave = () => process.env.CHAVE_PORTAL_TRANSPARENCIA;
 const brl = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 
@@ -28,7 +30,7 @@ export function cnpjMatriz(basico) {
  */
 async function situacaoFederal(cnpj) {
   try {
-    const res = await http(`${CGU}/pessoa-juridica?cnpj=${cnpj}`, { headers: { 'chave-api-dados': chave(), Accept: 'application/json' } });
+    const res = await filaCgu(() => http(`${CGU}/pessoa-juridica?cnpj=${cnpj}`, { headers: { 'chave-api-dados': chave(), Accept: 'application/json' } }));
     const texto = (await res.text()).trim();
     return texto ? JSON.parse(texto) : {};
   } catch {
@@ -54,9 +56,9 @@ export const empresas = {
         aviso: `Nenhuma empresa encontrada no quadro de sócios da Receita${mes ? ` (dados de ${mes})` : ''}.` };
     }
 
-    // Situação de cada empresa no governo federal (até 15 empresas por consulta).
+    // Situação de cada empresa no governo federal (até 10 empresas por consulta, para poupar a cota da CGU).
     const situacoes = chave()
-      ? await Promise.all(lista.slice(0, 15).map((x) => situacaoFederal(cnpjMatriz(x.cnpj_basico))))
+      ? await Promise.all(lista.slice(0, LIMITE_EMPRESAS).map((x) => situacaoFederal(cnpjMatriz(x.cnpj_basico))))
       : [];
 
     let comDinheiroFederal = 0;
@@ -89,7 +91,7 @@ export const empresas = {
       correspondencia: 'nome_cpf_parcial',
       link: 'https://www.gov.br/receitafederal/dados',
       alerta: false,
-      aviso: lista.length > 15 ? `Situação no governo federal consultada para as 15 empresas de maior capital (de ${lista.length}).` : null,
+      aviso: lista.length > LIMITE_EMPRESAS ? `Situação no governo federal consultada para as ${LIMITE_EMPRESAS} empresas de maior capital (de ${lista.length}).` : null,
       contagem: { total: lista.length, comDinheiroFederal, sancionadas, consultadas: situacoes.length },
       indicadores: [
         { rotulo: 'Empresas em que é sócio(a)', valor: lista.length.toLocaleString('pt-BR'), detalhe: mes ? `Receita Federal, dados de ${mes}` : null },

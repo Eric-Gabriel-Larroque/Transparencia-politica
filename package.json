@@ -3,10 +3,13 @@
   "version": "0.1.0",
   "description": "Agregador de dados públicos oficiais sobre políticos brasileiros",
   "type": "module",
-  "engines": { "node": ">=22.13" },
+  "engines": {
+    "node": ">=22.13"
+  },
   "scripts": {
     "indexar": "node --no-warnings scripts/indexar.js",
-    "start": "node --no-warnings --env-file-if-exists=.env src/server.js"
+    "start": "node --no-warnings --env-file-if-exists=.env src/server.js",
+    "reportes": "node --no-warnings scripts/reportes.js"
   },
   "dependencies": {
     "yauzl": "^3.2.0"

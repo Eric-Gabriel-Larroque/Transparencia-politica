@@ -1,16 +1,15 @@
-// Servidor HTTP: serve a página e a API de busca/perfil.
+// Servidor HTTP: páginas (com título e pré-visualização gerados no servidor), API de busca/perfil,
+// sitemap para buscadores e recebimento de reportes de erro.
 // Sem dependências externas: node:http + node:sqlite.
 
 import http from 'node:http';
 import dns from 'node:dns';
-
-// Prefere IPv4 nas conexões de saída. O IPv6 da Hostinger é registrado na Europa e serviços
-// brasileiros com bloqueio por país (ex.: DJEN do CNJ) recusam esse endereço; o IPv4 é do Brasil.
-dns.setDefaultResultOrder('ipv4first');
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { abrirBanco } from './lib/db.js';
+import { lerFicha, gravarFicha, registrarReporte } from './lib/cache.js';
 import { normalizar, soDigitos, mascararCpf } from './lib/util.js';
 import { montarResumo, NAO_COBRE } from './resumo.js';
 import { tse, tcu } from './fontes/locais.js';
@@ -22,16 +21,24 @@ import { carregarFinanciamento } from './fontes/financiamento.js';
 import { empresas } from './fontes/empresas.js';
 import { diarios } from './fontes/diarios.js';
 
+// Prefere IPv4 nas conexões de saída. O IPv6 da Hostinger é registrado na Europa e serviços
+// brasileiros com bloqueio por país (ex.: DJEN do CNJ) recusam esse endereço; o IPv4 é do Brasil.
+dns.setDefaultResultOrder('ipv4first');
+
 const FONTES = [tse, tcu, cnj, djen, cgu, empresas, camara, senado, diarios];
 const PORTA = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || undefined; // em produção: 127.0.0.1 (atrás do Caddy)
+const SITE = (process.env.SITE_URL || 'https://transparencia-politica.tech').replace(/\/$/, '');
 const LIMITE_POR_MINUTO = Number(process.env.LIMITE_POR_MINUTO) || 20;
 const PUBLICO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../public');
-const CACHE_MS = 6 * 60 * 60 * 1000;
+const VALIDADE_CACHE = 24 * 60 * 60 * 1000; // ficha completa guardada por 24h (banco, sobrevive a reinícios)
+const VALIDADE_CACHE_PARCIAL = 10 * 60 * 1000; // ficha com alguma fonte fora do ar: 10 min, só em memória
 const TIMEOUT_FONTE = 45_000;
+const POR_SITEMAP = 50_000;
 
 const db = abrirBanco();
-const cache = new Map();
+const cacheParcial = new Map();
+const emAndamento = new Map(); // id -> Promise: várias pessoas abrindo a mesma ficha geram uma consulta só
 
 // ---------------------------------------------------------------- busca
 
@@ -111,15 +118,12 @@ async function consultarFontes(p) {
   }));
 }
 
-async function perfil(id) {
-  const hit = cache.get(id);
-  if (hit && Date.now() - hit.em < CACHE_MS) return hit.dados;
-
+async function montarFicha(id) {
   const p = carregarPessoa(id);
   if (!p) return null;
   const fontes = await consultarFontes(p);
   const financiamento = carregarFinanciamento(db, p.candidaturas);
-  const dados = {
+  return {
     pessoa: {
       id: p.id, nome: p.nome, urnas: p.urnas, cargos: p.cargos, cpf: mascararCpf(p.cpf), nascimento: p.nascimento,
       identificacao: p.cpf ? 'CPF (divulgado pelo TSE)' : 'nome completo e data de nascimento',
@@ -137,66 +141,238 @@ async function perfil(id) {
     apoio: { url: process.env.APOIO_URL || 'https://buymeacoffee.com/masbahh' },
     indiceAtualizadoEm: db.prepare("SELECT valor FROM meta WHERE chave = 'atualizado_em'").get()?.valor,
   };
-  // Só guarda no cache se nenhuma fonte falhou, para tentar de novo na próxima visita.
-  if (!fontes.some((f) => f.status === 'erro')) cache.set(id, { em: Date.now(), dados });
-  return dados;
+}
+
+function fichaEmCache(id) {
+  const parcial = cacheParcial.get(id);
+  if (parcial && Date.now() - parcial.em < VALIDADE_CACHE_PARCIAL) return parcial.dados;
+  return lerFicha(id, VALIDADE_CACHE);
+}
+
+async function perfil(id) {
+  const pronta = fichaEmCache(id);
+  if (pronta) return pronta;
+  if (emAndamento.has(id)) return emAndamento.get(id);
+
+  const promessa = montarFicha(id).then((dados) => {
+    if (dados) {
+      // Ficha completa vai para o banco (24h). Com alguma fonte fora do ar, guarda só 10 min em memória.
+      if (dados.fontes.some((f) => f.status === 'erro')) cacheParcial.set(id, { em: Date.now(), dados });
+      else gravarFicha(id, dados);
+    }
+    return dados;
+  }).finally(() => emAndamento.delete(id));
+  emAndamento.set(id, promessa);
+  return promessa;
 }
 
 // ---------------------------------------------------------------- limite de uso
-// Cada perfil consulta várias APIs externas (e gasta a chave da CGU): limita por visitante.
 
 const acessos = new Map();
 function ipDe(req) {
+  // Atrás do Caddy (e opcionalmente do Cloudflare), o IP real vem nos cabeçalhos.
   const local = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
-  const encaminhado = req.headers['x-forwarded-for']?.split(',')[0].trim();
-  return (local && encaminhado) || req.socket.remoteAddress;
+  if (!local) return req.socket.remoteAddress;
+  return req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
 }
-function excedeuLimite(ip) {
+function excedeuLimite(chave, limite, janelaMs = 60_000) {
   const agora = Date.now();
-  const recentes = (acessos.get(ip) ?? []).filter((t) => agora - t < 60_000);
+  const recentes = (acessos.get(chave) ?? []).filter((t) => agora - t < janelaMs);
   recentes.push(agora);
-  acessos.set(ip, recentes);
-  return recentes.length > LIMITE_POR_MINUTO;
+  acessos.set(chave, recentes);
+  return recentes.length > limite;
 }
 setInterval(() => {
   const agora = Date.now();
-  for (const [ip, ts] of acessos) if (!ts.some((t) => agora - t < 60_000)) acessos.delete(ip);
-}, 5 * 60_000).unref();
+  for (const [k, ts] of acessos) if (!ts.some((t) => agora - t < 3_600_000)) acessos.delete(k);
+}, 10 * 60_000).unref();
+
+// ---------------------------------------------------------------- páginas (HTML com meta tags)
+
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const capitalizar = (s) => String(s ?? '').toLowerCase().replace(/(^|\s)\S/g, (l) => l.toUpperCase());
+let modelo = null;
+function modeloHtml() {
+  // Relê a cada requisição em desenvolvimento; em produção o arquivo só muda com reinício.
+  if (!modelo || process.env.NODE_ENV !== 'production') modelo = fs.readFileSync(path.join(PUBLICO, 'index.html'), 'utf8');
+  return modelo;
+}
+
+function metaTags({ titulo, descricao, url, indexar = true }) {
+  return `<title>${esc(titulo)}</title>
+  <meta name="description" content="${esc(descricao)}">
+  <link rel="canonical" href="${esc(url)}">
+  ${indexar ? '' : '<meta name="robots" content="noindex">'}
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Ficha Pública">
+  <meta property="og:title" content="${esc(titulo)}">
+  <meta property="og:description" content="${esc(descricao)}">
+  <meta property="og:url" content="${esc(url)}">
+  <meta property="og:image" content="${SITE}/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="pt_BR">
+  <meta name="twitter:card" content="summary_large_image">`;
+}
+
+function paginaInicial() {
+  return modeloHtml()
+    .replace('<!--META-->', metaTags({
+      titulo: 'Ficha Pública · dados oficiais sobre políticos',
+      descricao: 'Consulte candidaturas, bens, financiamento de campanha, votações, empresas e registros no TCU, CNJ e Diário de Justiça de qualquer político brasileiro. Só dados oficiais, com link para a fonte.',
+      url: `${SITE}/`,
+    }))
+    .replace('<!--CONTEUDO-->', '');
+}
+
+function paginaPolitico(id) {
+  const [ano, sq] = id.split('-');
+  const ref = db.prepare('SELECT pessoa FROM candidaturas WHERE ano = ? AND sq = ?').get(Number(ano), sq);
+  const pessoa = ref && db.prepare('SELECT * FROM pessoas WHERE pessoa = ?').get(ref.pessoa);
+  if (!pessoa) return null;
+  const r = resumirPessoa(pessoa);
+  const nome = capitalizar(r.nome);
+  const cargos = r.cargos.map(capitalizar).join(', ');
+  const titulo = `${nome}${r.urnas[0] && normalizar(r.urnas[0]) !== normalizar(r.nome) ? ` (${capitalizar(r.urnas[0])})` : ''} · Ficha Pública`;
+  const descricao = `${cargos} · ${r.ufs.join(', ')} · ${r.partidos.join(', ')}. ${r.candidaturas} candidatura(s) de ${r.anos[0]} a ${r.anos[1]}`
+    + `${r.eleito ? `, eleito(a) ${r.eleito} vez(es)` : ''}. Bens, financiamento, votações, empresas e registros em órgãos de controle, com fonte oficial.`;
+  // Conteúdo básico já no HTML: buscadores e quem está sem JavaScript veem o essencial.
+  const conteudo = `<article class="cabecalho"><h1>${esc(nome)}</h1>
+    <p class="meta">${esc(cargos)} · ${esc(r.ufs.join(', '))} · ${esc(r.partidos.join(', '))}</p>
+    <p class="meta">${esc(descricao)}</p><p class="carregando">Consultando as fontes oficiais</p></article>`;
+  // A ficha "canônica" é a da candidatura mais recente (evita a mesma pessoa em vários endereços).
+  return modeloHtml()
+    .replace('<!--META-->', metaTags({ titulo, descricao, url: `${SITE}/p/${pessoa.id}` }))
+    .replace('<!--CONTEUDO-->', conteudo);
+}
+
+function enviarHtml(res, status, html) {
+  res.writeHead(status, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+  res.end(html);
+}
+
+// ---------------------------------------------------------------- sitemap
+
+function sitemapIndice() {
+  const total = db.prepare('SELECT COUNT(*) AS n FROM pessoas').get().n;
+  const partes = Math.ceil(total / POR_SITEMAP);
+  const itens = Array.from({ length: partes }, (_, i) => `<sitemap><loc>${SITE}/sitemap-${i + 1}.xml</loc></sitemap>`).join('');
+  return `<?xml version="1.0" encoding="UTF-8"?><sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${itens}</sitemapindex>`;
+}
+
+function sitemapParte(n) {
+  // Eleitos e candidaturas mais recentes primeiro, com prioridade maior.
+  const linhas = db.prepare(`SELECT id, eleito, ultimo_ano FROM pessoas ORDER BY eleito DESC, ultimo_ano DESC, pessoa
+    LIMIT ? OFFSET ?`).all(POR_SITEMAP, (n - 1) * POR_SITEMAP);
+  const urls = linhas.map((l) => `<url><loc>${SITE}/p/${l.id}</loc><priority>${l.eleito ? '0.8' : '0.4'}</priority></url>`).join('');
+  return `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls}</urlset>`;
+}
+
+// ---------------------------------------------------------------- reportes de erro
+
+function lerCorpo(req, limite = 10_000) {
+  return new Promise((resolve, reject) => {
+    let corpo = '';
+    req.on('data', (c) => { corpo += c; if (corpo.length > limite) { reject(new Error('corpo grande demais')); req.destroy(); } });
+    req.on('end', () => resolve(corpo));
+    req.on('error', reject);
+  });
+}
+
+async function receberReporte(req, res) {
+  const ip = ipDe(req);
+  if (excedeuLimite(`reporte:${ip}`, 5, 3_600_000)) return json(res, 429, { erro: 'Muitos reportes em pouco tempo. Tente mais tarde.' });
+  let d;
+  try { d = JSON.parse(await lerCorpo(req)); } catch { return json(res, 400, { erro: 'Envio inválido.' }); }
+  const ficha = String(d.ficha ?? '').match(/^\d{4}-\d+$/)?.[0];
+  const mensagem = String(d.mensagem ?? '').trim().slice(0, 3000);
+  if (!ficha || mensagem.length < 10) return json(res, 400, { erro: 'Descreva o problema (pelo menos 10 caracteres).' });
+  registrarReporte({
+    ficha,
+    nome: String(d.nome ?? '').slice(0, 200),
+    secao: String(d.secao ?? '').slice(0, 200),
+    mensagem,
+    contato: String(d.contato ?? '').trim().slice(0, 200) || null,
+    // Guarda só um resumo irreversível do IP (para identificar abuso), não o IP em si.
+    ipHash: crypto.createHash('sha256').update(`${ip}|ficha-publica`).digest('hex').slice(0, 16),
+  });
+  return json(res, 200, { ok: true });
+}
 
 // ---------------------------------------------------------------- HTTP
 
-const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml' };
+const TIPOS = {
+  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
+  '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.txt': 'text/plain; charset=utf-8',
+};
 
 function json(res, status, corpo) {
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
   res.end(JSON.stringify(corpo));
+}
+
+function arquivoEstatico(res, nome) {
+  const arquivo = path.join(PUBLICO, path.normalize(nome));
+  if (!arquivo.startsWith(PUBLICO) || !fs.existsSync(arquivo) || fs.statSync(arquivo).isDirectory()) return false;
+  const ext = path.extname(arquivo);
+  res.writeHead(200, {
+    'Content-Type': TIPOS[ext] ?? 'application/octet-stream',
+    // CSS/JS mudam a cada atualização: o navegador revalida; imagens podem ficar mais tempo.
+    'Cache-Control': ext === '.png' ? 'public, max-age=86400' : 'public, max-age=0, must-revalidate',
+  });
+  fs.createReadStream(arquivo).pipe(res);
+  return true;
 }
 
 const servidor = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
+  const caminho = url.pathname;
   try {
-    if (url.pathname === '/api/buscar') {
+    // API
+    if (caminho === '/api/buscar') {
       const q = url.searchParams.get('q') ?? '';
       return json(res, 200, { resultados: buscar(q).map(resumirPessoa) });
     }
-    const m = url.pathname.match(/^\/api\/politico\/(\d{4}-\d+)$/);
+    const m = caminho.match(/^\/api\/politico\/(\d{4}-\d+)$/);
     if (m) {
-      if (!cache.has(m[1]) && excedeuLimite(ipDe(req))) {
+      if (!fichaEmCache(m[1]) && !emAndamento.has(m[1]) && excedeuLimite(ipDe(req), LIMITE_POR_MINUTO)) {
         return json(res, 429, { erro: 'Muitas consultas em pouco tempo. Aguarde um minuto e tente de novo.' });
       }
       const dados = await perfil(m[1]);
       return dados ? json(res, 200, dados) : json(res, 404, { erro: 'Político não encontrado' });
     }
-    // Arquivos estáticos
-    const arquivo = path.join(PUBLICO, url.pathname === '/' ? 'index.html' : path.normalize(url.pathname));
-    if (!arquivo.startsWith(PUBLICO) || !fs.existsSync(arquivo) || fs.statSync(arquivo).isDirectory()) {
-      res.writeHead(404); return res.end('Não encontrado');
+    if (caminho === '/api/reportar' && req.method === 'POST') return receberReporte(req, res);
+
+    // Páginas
+    if (caminho === '/' || caminho === '/index.html') return enviarHtml(res, 200, paginaInicial());
+    const p = caminho.match(/^\/p\/(\d{4}-\d+)\/?$/);
+    if (p) {
+      const html = paginaPolitico(p[1]);
+      return html ? enviarHtml(res, 200, html) : enviarHtml(res, 404, paginaInicial().replace('<meta property="og:type"', '<meta name="robots" content="noindex"><meta property="og:type"'));
     }
-    res.writeHead(200, { 'Content-Type': TIPOS[path.extname(arquivo)] ?? 'application/octet-stream' });
-    fs.createReadStream(arquivo).pipe(res);
+    if (caminho === '/sobre' || caminho === '/sobre/') return arquivoEstatico(res, 'sobre.html') || enviarHtml(res, 404, 'Não encontrado');
+
+    // Buscadores
+    if (caminho === '/robots.txt') {
+      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+      return res.end(`User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: ${SITE}/sitemap.xml\n`);
+    }
+    if (caminho === '/sitemap.xml') {
+      res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8' });
+      return res.end(sitemapIndice());
+    }
+    const sm = caminho.match(/^\/sitemap-(\d+)\.xml$/);
+    if (sm) {
+      res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8' });
+      return res.end(sitemapParte(Number(sm[1])));
+    }
+
+    // Arquivos estáticos
+    if (arquivoEstatico(res, caminho)) return;
+    enviarHtml(res, 404, paginaInicial());
   } catch (e) {
     console.error(e);
-    json(res, 500, { erro: 'Erro interno' });
+    if (!res.headersSent) json(res, 500, { erro: 'Erro interno' });
   }
 });
 

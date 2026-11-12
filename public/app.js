@@ -1,4 +1,4 @@
-// Interface: busca e ficha do político. Roteamento por hash (#/ e #/p/<id>).
+// Interface: busca e ficha do político. Endereços reais (/ e /p/<id>) com History API.
 
 const app = document.getElementById('app');
 
@@ -31,7 +31,7 @@ function telaBusca(q = '') {
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     const valor = form.q.value.trim();
-    location.hash = `#/?q=${encodeURIComponent(valor)}`;
+    navegar(`/?q=${encodeURIComponent(valor)}`);
   });
   if (q) buscar(q);
   else form.q.focus();
@@ -47,7 +47,7 @@ async function buscar(q) {
       return;
     }
     alvo.innerHTML = `<ul class="resultados">${resultados.map((r) => `
-      <li><a href="#/p/${esc(r.id)}">
+      <li><a href="/p/${esc(r.id)}">
         <div class="nome">${esc(capitalizar(r.nome))}${r.urnas[0] ? ` <span class="meta">(${esc(r.urnas.join(', '))})</span>` : ''}</div>
         <div class="meta">${esc(r.cargos.map(capitalizar).join(', '))} · ${esc(r.ufs.join(', '))} · ${esc(r.partidos.join(', '))}</div>
         <div class="meta">${r.candidaturas} candidatura(s) de ${r.anos[0]} a ${r.anos[1]}${r.eleito ? ` · eleito(a) ${r.eleito}x` : ''}</div>
@@ -185,23 +185,27 @@ function blocoApoio(apoio) {
 }
 
 async function telaPerfil(id) {
-  app.innerHTML = `<a class="voltar" href="javascript:history.back()">← voltar</a>
-    <p class="carregando">Consultando TSE, TCU, CNJ, Câmara e Senado (pode levar até 30 segundos)</p>`;
+  app.innerHTML = `<a class="voltar" href="/" data-voltar>← voltar</a>
+    <p class="carregando">Consultando as fontes oficiais (pode levar até 30 segundos na primeira consulta)</p>`;
   let d;
   try {
     d = await api(`/api/politico/${encodeURIComponent(id)}`);
   } catch (e) {
-    app.innerHTML = `<a class="voltar" href="#/">← voltar</a><p class="caixa aviso">${esc(e.message)}</p>`;
+    app.innerHTML = `<a class="voltar" href="/">← voltar</a><p class="caixa aviso">${esc(e.message)}</p>`;
     return;
   }
   const p = d.pessoa;
   document.title = `${capitalizar(p.nome)} · Ficha Pública`;
   app.innerHTML = `
-    <a class="voltar" href="javascript:history.back()">← voltar</a>
+    <a class="voltar" href="/" data-voltar>← voltar</a>
     <header class="cabecalho">
       <h1>${esc(capitalizar(p.nome))}</h1>
       <div class="meta">${p.urnas.length ? `Nome de urna: ${esc(p.urnas.join(', '))} · ` : ''}${esc(p.cargos.map(capitalizar).join(', '))}</div>
       <div class="meta">Identificado por ${esc(p.identificacao)}${p.cpf ? ` (${esc(p.cpf)})` : ''}${p.nascimento ? ` · nascimento ${esc(p.nascimento)}` : ''}</div>
+      <div class="acoes-ficha">
+        <button type="button" class="acao" data-compartilhar>Compartilhar</button>
+        <a class="acao" href="#reportar">Reportar erro</a>
+      </div>
     </header>
 
     <section class="cartao">
@@ -238,19 +242,113 @@ async function telaPerfil(id) {
 
     <p class="meta" style="margin-top:16px">Consulta feita em ${new Date(d.consultadoEm).toLocaleString('pt-BR')}.
       Índice local do TSE/TCU atualizado em ${d.indiceAtualizadoEm ? new Date(d.indiceAtualizadoEm).toLocaleString('pt-BR') : '—'}.</p>
+    ${blocoReporte(d)}
     ${blocoApoio(d.apoio)}`;
-
+  ligarCompartilhar(p);
+  ligarReporte(p.id);
 }
 
-// ---------------------------------------------------------------- rotas
+// ---------------------------------------------------------------- compartilhar e reportar
+
+function ligarCompartilhar(p) {
+  const botao = app.querySelector('[data-compartilhar]');
+  const url = `${location.origin}/p/${p.id}`;
+  const texto = `Ficha pública de ${capitalizar(p.nome)}: candidaturas, bens, financiamento, votações e registros oficiais`;
+  botao?.addEventListener('click', async () => {
+    if (navigator.share) {
+      try { await navigator.share({ title: document.title, text: texto, url }); } catch { /* cancelado */ }
+      return;
+    }
+    // Sem compartilhamento nativo (computador): mostra opções.
+    botao.insertAdjacentHTML('afterend', `<span class="opcoes-compartilhar">
+      <a class="acao" href="https://wa.me/?text=${encodeURIComponent(`${texto} ${url}`)}" target="_blank" rel="noopener">WhatsApp</a>
+      <a class="acao" href="https://twitter.com/intent/tweet?text=${encodeURIComponent(texto)}&url=${encodeURIComponent(url)}" target="_blank" rel="noopener">X</a>
+      <button type="button" class="acao" data-copiar>Copiar link</button></span>`);
+    botao.remove();
+    app.querySelector('[data-copiar]').addEventListener('click', async (ev) => {
+      try { await navigator.clipboard.writeText(url); ev.target.textContent = 'Link copiado ✓'; } catch { ev.target.textContent = url; }
+    });
+  });
+}
+
+function blocoReporte(d) {
+  const secoes = ['Resumo', 'Candidaturas', 'Financiamento de campanha', 'Bens declarados', ...d.fontes.map((f) => f.nome), 'Outro'];
+  return `<section class="cartao reporte" id="reportar">
+    <h2>Encontrou um erro?</h2>
+    <p class="meta">Dado errado, homônimo misturado ou informação desatualizada: conte o que viu. Os dados vêm de fontes oficiais,
+      mas o cruzamento é nosso e pode falhar. Se você é a pessoa desta ficha, também pode usar este canal.</p>
+    <form data-reporte>
+      <label>Em qual parte?
+        <select name="secao">${secoes.map((s) => `<option>${esc(s)}</option>`).join('')}</select></label>
+      <label>O que está errado?
+        <textarea name="mensagem" rows="4" required minlength="10" maxlength="3000" placeholder="Ex.: o processo X é de outra pessoa com o mesmo nome"></textarea></label>
+      <label>Contato para retorno (opcional)
+        <input name="contato" maxlength="200" placeholder="e-mail ou telefone"></label>
+      <button type="submit" class="botao">Enviar</button>
+      <p class="meta" data-status></p>
+    </form>
+  </section>`;
+}
+
+function ligarReporte(id) {
+  const form = app.querySelector('[data-reporte]');
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const status = form.querySelector('[data-status]');
+    const botao = form.querySelector('button');
+    botao.disabled = true;
+    status.textContent = 'Enviando…';
+    try {
+      const res = await fetch('/api/reportar', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ficha: id, nome: document.querySelector('h1')?.textContent, secao: form.secao.value,
+          mensagem: form.mensagem.value, contato: form.contato.value }),
+      });
+      const r = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(r.erro ?? 'Não foi possível enviar agora.');
+      form.innerHTML = '<p class="caixa neutra">Obrigado! Seu reporte foi registrado e será analisado.</p>';
+    } catch (err) {
+      status.textContent = err.message;
+      botao.disabled = false;
+    }
+  });
+}
+
+// ---------------------------------------------------------------- rotas (History API)
+
+let navegouDentro = false;
+function navegar(destino, { substituir = false } = {}) {
+  navegouDentro = true;
+  if (substituir) history.replaceState(null, '', destino); else history.pushState(null, '', destino);
+  rotear();
+  window.scrollTo(0, 0);
+}
 
 function rotear() {
-  const h = location.hash.slice(1) || '/';
-  const perfil = h.match(/^\/p\/([\w-]+)/);
+  // Links antigos com # (ex.: /#/p/2022-123) continuam funcionando.
+  if (location.hash.startsWith('#/')) {
+    history.replaceState(null, '', location.hash.slice(1));
+  }
+  const perfil = location.pathname.match(/^\/p\/(\d{4}-\d+)/);
   if (perfil) return telaPerfil(perfil[1]);
-  document.title = 'Ficha Pública';
-  const q = new URLSearchParams(h.split('?')[1] ?? '').get('q') ?? '';
-  telaBusca(q);
+  document.title = 'Ficha Pública · dados oficiais sobre políticos';
+  telaBusca(new URLSearchParams(location.search).get('q') ?? '');
 }
-window.addEventListener('hashchange', rotear);
+
+// Links internos navegam sem recarregar a página.
+document.addEventListener('click', (e) => {
+  const a = e.target.closest('a');
+  if (!a || a.target === '_blank' || e.metaKey || e.ctrlKey || e.shiftKey || a.origin !== location.origin) return;
+  if (a.hash && a.pathname === location.pathname) return; // âncora na mesma página (ex.: #reportar)
+  if (a.hasAttribute('data-voltar') && navegouDentro) {
+    e.preventDefault();
+    history.back();
+    return;
+  }
+  if (a.pathname === '/' || a.pathname.startsWith('/p/')) {
+    e.preventDefault();
+    navegar(a.pathname + a.search);
+  }
+});
+window.addEventListener('popstate', rotear);
 rotear();

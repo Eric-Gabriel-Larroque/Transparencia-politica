@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sobre e metodologia · Ficha Pública</title>
+  <meta name="description" content="Como a Ficha Pública reúne dados oficiais sobre políticos: fontes, cruzamentos, limitações, privacidade e como reportar erros.">
+  <link rel="canonical" href="https://transparencia-politica.tech/sobre">
+  <meta property="og:title" content="Sobre e metodologia · Ficha Pública">
+  <meta property="og:description" content="De onde vêm os dados, como são cruzados e o que a ficha não cobre.">
+  <meta property="og:image" content="https://transparencia-politica.tech/og.png">
+  <meta property="og:url" content="https://transparencia-politica.tech/sobre">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topo">
+    <a href="/" class="marca">Ficha Pública</a>
+    <span class="sub">dados oficiais sobre políticos, sem interpretação</span>
+  </header>
+
+  <main class="texto">
+    <h1>Sobre e metodologia</h1>
+
+    <p>A Ficha Pública reúne, numa página só, o que bases <strong>públicas e oficiais</strong> dizem sobre qualquer pessoa que já se
+      candidatou no Brasil, de vereador(a) a presidente. É um projeto independente, gratuito, sem anúncios e sem vínculo com partidos.</p>
+    <p>Nada é escrito por pessoas nem por inteligência artificial. Os dados aparecem como as fontes publicam, e o resumo de cada ficha é
+      montado por <strong>regras fixas</strong>: contagens, somas e comparações. Cada informação tem link para a fonte oficial.</p>
+
+    <h2>De onde vêm os dados</h2>
+    <div class="tabela-rolagem"><table>
+      <thead><tr><th>Fonte</th><th>O que mostramos</th></tr></thead>
+      <tbody>
+        <tr><td>TSE – candidaturas</td><td>Todas as candidaturas desde 2018, resultado, registro indeferido ou cassado e o motivo, bens declarados item a item</td></tr>
+        <tr><td>TSE – prestação de contas</td><td>Quanto cada campanha arrecadou, quanto foi dinheiro público, maiores doadores, gastos e fornecedores</td></tr>
+        <tr><td>TCU</td><td>Contas julgadas irregulares, inabilitados para função pública, inidôneos</td></tr>
+        <tr><td>CNJ</td><td>Condenações cíveis por improbidade administrativa; processos publicados no Diário de Justiça Eletrônico Nacional desde 2024</td></tr>
+        <tr><td>CGU – Portal da Transparência</td><td>Sanções (CEIS, CNEP, CEAF), emendas parlamentares, situação federal das empresas</td></tr>
+        <tr><td>Câmara dos Deputados e Senado</td><td>Mandatos desde 1983, proposições, votações nominais, cota parlamentar</td></tr>
+        <tr><td>Receita Federal</td><td>Empresas das quais a pessoa é sócia</td></tr>
+        <tr><td>Querido Diário</td><td>Menções em diários oficiais municipais (prefeitos e vereadores)</td></tr>
+      </tbody>
+    </table></div>
+    <p>Bases baixadas (TSE, TCU, Câmara, Senado, Receita) são atualizadas toda semana. As demais são consultadas na hora em que a ficha
+      é aberta e guardadas por até 24 horas.</p>
+
+    <h2>Como sabemos que é a mesma pessoa</h2>
+    <p>Cada registro na ficha tem uma etiqueta dizendo como foi ligado à pessoa:</p>
+    <ul>
+      <li><strong>por CPF</strong>: o mesmo CPF divulgado pelo TSE. É o cruzamento mais seguro.</li>
+      <li><strong>por nome e nascimento</strong>: nome civil completo e data de nascimento idênticos (Câmara e Senado não publicam CPF).</li>
+      <li><strong>por nome e CPF parcial</strong>: nome completo idêntico e os 6 dígitos do CPF que a Receita deixa visíveis.</li>
+      <li><strong>por nome</strong>: só o nome completo. <strong>Pode ser outra pessoa com o mesmo nome</strong>, e por isso esses registros
+        nunca aparecem em vermelho no resumo.</li>
+    </ul>
+    <p>No Diário de Justiça, que só permite busca por nome, destacamos os processos em tribunais dos estados onde a pessoa concorreu e
+      nos tribunais superiores (o estado é lido no número do processo). Os de outros estados ficam recolhidos, como provavelmente de outras pessoas.</p>
+
+    <h2>O que as cores do resumo significam</h2>
+    <ul>
+      <li><strong>Vermelho</strong>: registro em órgão de controle ou Justiça confirmado pelo CPF.</li>
+      <li><strong>Amarelo</strong>: algo a conferir: registro só pelo nome (possível homônimo) ou fonte que não respondeu.</li>
+      <li><strong>Verde</strong>: nada encontrado naquela base específica.</li>
+    </ul>
+
+    <h2>O que a ficha não cobre</h2>
+    <ul>
+      <li>Condenações criminais confirmadas por CPF: não existe base pública unificada no Brasil.</li>
+      <li>Processos no STF e certidões criminais do TSE: esses sistemas bloqueiam consultas automáticas.</li>
+      <li>Processos em sigilo, que não são publicados em lugar nenhum.</li>
+      <li>Tribunais de contas estaduais e municipais, e contratos de empresas com estados e prefeituras.</li>
+      <li>Candidaturas anteriores a 2018.</li>
+    </ul>
+    <p><strong>"Nenhum registro" não é atestado de ficha limpa</strong>: significa só que nada foi encontrado nas bases consultadas.
+      E aparecer em um cadastro também não significa condenação criminal: leia a situação de cada registro e confira na fonte.</p>
+
+    <h2>Privacidade</h2>
+    <ul>
+      <li>CPFs aparecem sempre mascarados (***.456.789-**), inclusive os de doadores de campanha.</li>
+      <li>Não usamos cookies de rastreamento nem anúncios.</li>
+      <li>Nos reportes de erro, guardamos só um resumo irreversível do IP (para evitar abuso), não o IP em si.</li>
+    </ul>
+
+    <h2>Encontrou um erro?</h2>
+    <p>Toda ficha tem um botão <strong>"Reportar erro"</strong>. Use-o para apontar dados errados ou homônimos misturados, inclusive se
+      você for a pessoa da ficha. Os reportes são lidos e, quando procedentes, o cruzamento é corrigido.</p>
+
+    <h2>Código aberto</h2>
+    <p>Todo o código está publicado em
+      <a href="https://github.com/Eric-Gabriel-Larroque/Transparencia-politica" target="_blank" rel="noopener">github.com/Eric-Gabriel-Larroque/Transparencia-politica</a>.
+      Qualquer pessoa pode conferir como cada dado é obtido e cruzado.</p>
+
+    <p class="apoio">Achou útil? Você pode ajudar a manter o servidor no ar:
+      <a href="https://buymeacoffee.com/masbahh" target="_blank" rel="noopener">☕ Buy me a coffee</a></p>
+    <p><a href="/">← Voltar para a busca</a></p>
+  </main>
+</body>
+</html>
