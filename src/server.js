@@ -241,8 +241,8 @@ function paginaInicial() {
   };
   return modeloHtml()
     .replace('<!--META-->', metaTags({
-      titulo: 'Ficha Pública · transparência política: processos, patrimônio e doadores de qualquer político',
-      descricao: 'Consulte processos, contas no TCU, condenações por improbidade, empresas, doadores de campanha, patrimônio e votações de qualquer político brasileiro, de vereador a presidente. Só dados oficiais, com link para a fonte, sem anúncios.',
+      titulo: 'Ficha Pública: processos e patrimônio de vereador a presidente',
+      descricao: 'Grátis e de código aberto: processos, TCU, empresas, doadores e patrimônio de qualquer político, de vereador a presidente. Dados oficiais, sem anúncios.',
       url: `${SITE}/`,
       extra: `<script type="application/ld+json">${JSON.stringify(dadosSite)}</script>`,
     }))

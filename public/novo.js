@@ -538,10 +538,10 @@ const estadosHtml = (() => {
 })();
 
 function telaInicio(q = '') {
-  document.title = 'Ficha Pública · ficha de integridade de qualquer político';
+  document.title = 'Ficha Pública: processos e patrimônio de vereador a presidente';
   app.innerHTML = `<section class="hero">
       <h1>Veja se um político tem problemas com a Justiça, com quem ele se relaciona e quem pagou a campanha dele.</h1>
-      <p>Processos, contas reprovadas no TCU, punições, empresas com contratos públicos, doadores e patrimônio de qualquer pessoa que já se candidatou no Brasil. Só dados oficiais, sem anúncios.</p>
+      <p>Processos, contas reprovadas no TCU, punições, empresas com contratos públicos, doadores e patrimônio de qualquer pessoa que já se candidatou no Brasil, de vereador a presidente. Só dados oficiais, sem anúncios e com <a href="https://github.com/Eric-Gabriel-Larroque/Transparencia-politica" target="_blank" rel="noopener" style="color:inherit">código aberto</a>.</p>
       <form data-busca><input name="q" type="search" placeholder="Nome, nome de urna ou CPF" value="${esc(q)}" aria-label="Buscar político" required minlength="3"><button>Buscar</button></form>
     </section>
     <div id="resultados"></div>
